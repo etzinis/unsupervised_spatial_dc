@@ -7,6 +7,7 @@
 """
 
 import numpy as np
+from scipy.spatial import distance as dst
 
 
 class RandomCirclePositioner(object):
@@ -18,7 +19,7 @@ class RandomCirclePositioner(object):
     {
         'thetas': angles in rads [<(+x, s1), <(+x, s2)] in list,
         'd_theta': < (+x, s2) - < (+x, s1),
-        'cartessian_positions': [(x_1, y_1), (x_2, y_2)],
+        'xy_positons': [(x_1, y_1), (x_2, y_2)], Cartessian
         'distances': [[||si-mj||]] sources are rows and mics are
         columns
     }
@@ -27,7 +28,7 @@ class RandomCirclePositioner(object):
 
 
                         s2     OOO ooo
-                                       OOo
+                                       OOo    (x1, y1)
                oOO
             oOO                               s1
           oOO
@@ -53,19 +54,30 @@ class RandomCirclePositioner(object):
                  min_angle=0.,
                  max_angle=np.pi,
                  radius=1.0,
-                 mic_distance_to_radius=0.001):
+                 mic_distance_percentage=0.001):
 
         self.min_angle = min_angle
         self.max_angle = max_angle
         self.radius = radius
-        self.mic_distance = 1.0 * self.radius * mic_distance_to_radius
-        self.mics = [(-self.mic_distance / 2, 0.),
-                     (self.mic_distance / 2, 0.)]
+        self.mic_distance = 2.0 * self.radius * mic_distance_percentage
+        self.m1 = (-self.mic_distance / 2, 0.)
+        self.m2 = (self.mic_distance / 2, 0.)
 
+    @staticmethod
+    def get_cartessian_position(radius,
+                                angle):
+        return radius * np.cos(angle), radius * np.sin(angle)
 
-    def get_cartessian_positions(self):
-        pass
+    def compute_distances_for_sources_and_mics(self, s1, s2):
+        """! si must be in format (xi, yi)"""
+        points = {'s1': s1, 's2': s2, 'm1': self.m1, 'm2': self.m2}
+        distances = {}
 
+        for point_1, xy1 in points.items():
+            for point_2, xy2 in points.items():
+                distances[point_1+point_2] = dst.euclidean(xy1, xy2)
+
+        return distances
 
     def get_angles(self, n_source_pairs):
         d_thetas = [theta for theta in
@@ -86,14 +98,29 @@ class RandomCirclePositioner(object):
         return thetas_1_2, d_thetas
 
     def get_sources_locations(self, n_source_pairs):
-        posi
         thetas, d_thetas = self.get_angles(n_source_pairs)
+        xys = [(self.get_cartessian_position(self.radius, th_1),
+                self.get_cartessian_position(self.radius, th_2))
+                for (th_1, th_2) in thetas]
 
+        distances = [self.compute_distances_for_sources_and_mics(s1,
+                                                                 s2)
+                     for (s1, s2) in xys]
 
+        sources_locations = [
+                             {'thetas': thetas[i],
+                              'd_theta': d_thetas[i],
+                              'xy_positons': xys[i],
+                              'distances': distances[i]}
+                             for i in np.arange(len(thetas))
+        ]
+
+        return sources_locations
 
 
 if __name__ == "__main__":
     print("yolo ")
     random_positioner = RandomCirclePositioner()
-    positions_info = random_positioner.get_sources_locations(4)
-    print(positions_info)
+    positions_info = random_positioner.get_sources_locations(2)
+    from pprint import pprint
+    pprint(positions_info)
