@@ -21,8 +21,12 @@ from spatial_two_mics.config import TIMIT_PATH
 
 
 class TimitLoader(object):
-    def __init__(self):
+    def __init__(self,
+                 load_audio_files=True,
+                 normalize_audio_by_std=True):
         self.dataset_path = TIMIT_PATH
+        self.load_audio_files = load_audio_files
+        self.normalize_audio_by_std = normalize_audio_by_std
 
     @staticmethod
     def get_all_wavs(path):
@@ -35,6 +39,8 @@ class TimitLoader(object):
             d_path = os.path.join(path, dial)
             speakers = os.listdir(os.path.join(d_path))
             for speaker in speakers:
+                if speaker.startswith('.'):
+                    continue
                 speaker_path = os.path.join(d_path, speaker)
                 wavs_paths = glob2.glob(os.path.join(speaker_path,
                                                      '*.wav'))
@@ -86,7 +92,6 @@ class TimitLoader(object):
             wavs_path = os.path.join(self.dataset_path, chunk)
             all_wavs_dic = self.get_all_wavs(wavs_path)
             data_dic[chunk] = all_wavs_dic
-            pprint.pprint(data_dic[chunk])
 
         return data_dic
 
