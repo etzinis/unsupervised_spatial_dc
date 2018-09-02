@@ -20,8 +20,9 @@ class RandomCirclePositioner(object):
         'thetas': angles in rads [<(+x, s1), <(+x, s2)] in list,
         'd_theta': < (+x, s2) - < (+x, s1),
         'xy_positons': [(x_1, y_1), (x_2, y_2)], Cartessian
-        'distances': [[||si-mj||]] sources are rows and mics are
-        columns
+        'distances': [[||si-mj||]] all precomputed distances
+        'taus': time delays in sample format
+        'amplitudes': a1 and a2 for: m2(t) = a1*s1(t+d1) + a2*s2(t+d2)
     }
     (theta_of_source_1, theta_of_source_1)
 
@@ -88,6 +89,12 @@ class RandomCirclePositioner(object):
                                 angle):
         return radius * np.cos(angle), radius * np.sin(angle)
 
+    def get_amplifier_values_for_sources(self):
+        a1 = np.random.uniform(self.min_mixture_ratio,
+                               self.max_mixture_ratio)
+        a2 = 1. - a1
+        return {"a1": a1, "a2": a2}
+
     def get_time_delays_for_sources(self,
                                     distances):
         taus = {"tau1": (distances['s1m1']-distances['s1m2']),
@@ -138,15 +145,18 @@ class RandomCirclePositioner(object):
 
         taus = [self.get_time_delays_for_sources(loc_dists)
                 for loc_dists in distances]
-        print(taus)
-        # mix_amplitudes
-        # time_delays = sel
+
+        mix_amplitudes = [self.get_amplifier_values_for_sources()
+                          for _ in taus]
 
         sources_locations = [
                              {'thetas': thetas[i],
                               'd_theta': d_thetas[i],
                               'xy_positons': xys[i],
-                              'distances': distances[i]}
+                              'distances': distances[i],
+                              'taus': taus[i],
+                              'amplitudes': mix_amplitudes[i]
+                              }
                              for i in np.arange(len(thetas))
         ]
 
@@ -157,4 +167,4 @@ if __name__ == "__main__":
     random_positioner = RandomCirclePositioner()
     positions_info = random_positioner.get_sources_locations(2)
     from pprint import pprint
-    # pprint(positions_info)
+    pprint(positions_info)
