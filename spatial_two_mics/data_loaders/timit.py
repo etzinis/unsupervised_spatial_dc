@@ -14,10 +14,10 @@ import pprint
 
 root_dir = os.path.join(
            os.path.dirname(os.path.realpath(__file__)),
-           '../')
+           '../../')
 sys.path.insert(0, root_dir)
 
-from config import TIMIT_PATH
+from spatial_two_mics.config import TIMIT_PATH
 
 
 class TimitLoader(object):
