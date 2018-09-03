@@ -10,7 +10,7 @@ import os
 import sys
 import scipy.io.wavfile as wavfile
 import glob2
-import pprint
+import numpy as np
 
 root_dir = os.path.join(
            os.path.dirname(os.path.realpath(__file__)),
@@ -22,14 +22,11 @@ from spatial_two_mics.config import TIMIT_PATH
 
 class TimitLoader(object):
     def __init__(self,
-                 load_audio_files=True,
                  normalize_audio_by_std=True):
         self.dataset_path = TIMIT_PATH
-        self.load_audio_files = load_audio_files
         self.normalize_audio_by_std = normalize_audio_by_std
 
-    @staticmethod
-    def get_all_wavs(path):
+    def get_all_wavs(self, path):
         data_dic = {}
         print("Searching inside: {}...".format(path))
         dialects = os.listdir(path)
@@ -47,6 +44,10 @@ class TimitLoader(object):
 
                 speaker_wavs = [list(wavfile.read(wav_p)) + [wav_p]
                                 for wav_p in wavs_paths]
+
+                if self.normalize_audio_by_std:
+                    speaker_wavs = [(sr, wav / np.std(wav), wav_p)
+                                    for (sr, wav, wav_p) in speaker_wavs]
 
                 speaker_wavs = [(wav_p.split('/')[-1].split('.wav')[0],
                                 {'wav': wav, 'sr': sr, 'path': wav_p})
