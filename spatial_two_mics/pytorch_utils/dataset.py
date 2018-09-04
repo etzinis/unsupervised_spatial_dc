@@ -7,6 +7,7 @@
 
 import os
 import sys
+import itertools
 from torch.utils.data import Dataset, DataLoader
 
 root_dir = os.path.join(
@@ -35,11 +36,9 @@ class PytorchCompatibleDataset(Dataset):
 class RandomCombinations(PytorchCompatibleDataset):
     def __init__(self,
                  audio_dataset_name="timit",
-                 gender_mixtures=None,
-                 n_mixtures=None,
-                 n_mixed_sources=None,
+                 n_mixtures=0,
+                 n_mixed_sources=2,
                  genders_mixtures=None,
-                 return_2_sets=False,
                  excluded_speakers=None,
                  subset_of_speakers='train'):
         super(RandomCombinations,
@@ -54,7 +53,10 @@ class RandomCombinations(PytorchCompatibleDataset):
                                   genders_mixtures,
                                   excluded_speakers)
 
-        # all_possible_combinations
+        mixture_combinations = self.get_mixture_combinations(
+                                    data_dic[subset_of_speakers],
+                                    n_mixed_sources=n_mixed_sources,
+                                    n_mixtures=n_mixtures)
 
     @staticmethod
     def get_available_speakers(data_dic,
@@ -81,6 +83,22 @@ class RandomCombinations(PytorchCompatibleDataset):
 
         return valid_speakers
 
+    def get_mixture_combinations(self,
+                                 speakers_dic,
+                                 n_mixed_sources=2,
+                                 n_mixtures=0):
+        sources = []
+        for speaker, info in speakers_dic.items():
+            sentences = info['sentences'].items()
+            sources += list(zip([speaker]*len(sentences), sentences))
+
+        print(sources[0])
+        mixtures_generator = itertools.combinations(sources,
+                                                    n_mixed_sources)
+        print(mixtures_generator)
+        print(next(mixtures_generator))
+        input()
+
 if __name__ == "__main__":
     timit_random_combs = RandomCombinations(
                          audio_dataset_name="timit",
@@ -88,5 +106,4 @@ if __name__ == "__main__":
                          subset_of_speakers='test',
                          n_mixtures=3,
                          excluded_speakers=['mwew0'])
-    print(timit_random_combs.used_speakers)
 
