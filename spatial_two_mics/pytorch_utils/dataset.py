@@ -40,21 +40,27 @@ class RandomCombinations(PytorchCompatibleDataset):
                  n_mixed_sources=None,
                  genders_mixtures=None,
                  return_2_sets=False,
+                 excluded_speakers=None,
                  subset_of_speakers='train'):
         super(RandomCombinations,
               self).__init__(audio_dataset_name=audio_dataset_name)
 
         data_dic = self.data_loader.load()
-        available_speakers = self.get_available_speakers(
+        if excluded_speakers is None:
+            excluded_speakers = []
+        self.used_speakers = self.get_available_speakers(
                                   data_dic,
                                   subset_of_speakers,
-                                  genders_mixtures)
-        print(available_speakers)
+                                  genders_mixtures,
+                                  excluded_speakers)
+
+        # all_possible_combinations
 
     @staticmethod
     def get_available_speakers(data_dic,
                                subset_of_speakers,
-                               genders_mixtures):
+                               genders_mixtures,
+                               excluded_speakers):
         try:
             available_speakers = sorted(list(data_dic[
                                  subset_of_speakers].keys()))
@@ -67,8 +73,10 @@ class RandomCombinations(PytorchCompatibleDataset):
 
         valid_speakers = []
         for speaker in available_speakers:
-            if data_dic[subset_of_speakers][speaker]['gender'] in  \
-                    genders_mixtures:
+
+            if ((speaker not in excluded_speakers) and
+                (data_dic[subset_of_speakers][speaker]['gender'] in
+                 genders_mixtures)):
                 valid_speakers.append(speaker)
 
         return valid_speakers
@@ -78,5 +86,7 @@ if __name__ == "__main__":
                          audio_dataset_name="timit",
                          genders_mixtures=['m'],
                          subset_of_speakers='test',
-                         n_mixtures=3)
+                         n_mixtures=3,
+                         excluded_speakers=['mwew0'])
+    print(timit_random_combs.used_speakers)
 
