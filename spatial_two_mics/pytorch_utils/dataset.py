@@ -36,35 +36,47 @@ class RandomCombinations(PytorchCompatibleDataset):
     def __init__(self,
                  audio_dataset_name="timit",
                  gender_mixtures=None,
-                 n_train_mixtures=5000,
-                 n_test_mixtures=2000,
-                 n_val_mixtures=1000,
-                 genders_mixtures=None):
+                 n_mixtures=None,
+                 n_mixed_sources=None,
+                 genders_mixtures=None,
+                 return_2_sets=False,
+                 subset_of_speakers='train'):
         super(RandomCombinations,
               self).__init__(audio_dataset_name=audio_dataset_name)
 
         data_dic = self.data_loader.load()
-        all_speakers = {'train': list(data_dic['train'].keys())}
-        n_test_speakers = int(len(data_dic['test']) / 2)
-        all_test_speakers = list(data_dic['test'].keys())
-        all_speakers['test'] = all_test_speakers[n_test_speakers:]
-        all_speakers['val'] = all_test_speakers[0:n_test_speakers]
+        available_speakers = self.get_available_speakers(
+                                  data_dic,
+                                  subset_of_speakers,
+                                  genders_mixtures)
+        print(available_speakers)
 
-        
+    @staticmethod
+    def get_available_speakers(data_dic,
+                               subset_of_speakers,
+                               genders_mixtures):
+        try:
+            available_speakers = sorted(list(data_dic[
+                                 subset_of_speakers].keys()))
+        except KeyError:
+            print("Subset: {} not available".format(subset_of_speakers))
+            raise KeyError
 
-        # print(len(train_data))
-        # for speaker, speaker_info in train_data.items():
-        #     print("{} {} {}".format(speaker,
-        #                             speaker_info["gender"],
-        #                             len(speaker_info['sentences'])))
-        #     from pprint import pprint
-        #     pprint(speaker_info)
-        input()
+        valid_genders = [(g in ['f', 'm']) for g in genders_mixtures]
+        assert valid_genders, ('Valid genders for mixtures are f and m')
 
+        valid_speakers = []
+        for speaker in available_speakers:
+            if data_dic[subset_of_speakers][speaker]['gender'] in  \
+                    genders_mixtures:
+                valid_speakers.append(speaker)
+
+        return valid_speakers
 
 if __name__ == "__main__":
-    timit_random_combs = RandomCombinations(audio_dataset_name="timit")
-    input()
-    print(timit_random_combs)
-    del timit_random_combs
-    input()
+    timit_random_combs = RandomCombinations(
+                         audio_dataset_name="timit",
+                         genders_mixtures=['m'],
+                         subset_of_speakers='test',
+                         n_mixtures=3)
+
