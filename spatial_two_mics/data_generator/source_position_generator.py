@@ -164,18 +164,37 @@ class RandomCirclePositioner(object):
         mix_amplitudes = self.get_amplifier_values_for_sources(
                               n_source_pairs)
 
-        sources_locations = {'thetas': thetas,
-                             'd_thetas': d_thetas,
-                             'xy_positons': xys,
+        sources_locations = {'thetas': np.asarray(thetas),
+                             'd_thetas': np.asarray(d_thetas),
+                             'xy_positons': np.asarray(xys),
                              'distances': distances,
-                             'taus': taus,
-                             'amplitudes': mix_amplitudes}
+                             'taus': np.asarray(list(taus.values())),
+                             'amplitudes': np.asarray(list(
+                                           mix_amplitudes.values()))}
 
         return sources_locations
 
 
-if __name__ == "__main__":
+def example_of_usage():
+    """
+    :return:
+    {'amplitudes': array([0.28292362, 0.08583346, 0.63124292]),
+     'd_thetas': array([1.37373734, 1.76785531]),
+     'distances': {'m1m1': 0.0,
+                   'm1m2': 0.03,
+                   'm1s1': 3.015, ...
+                   's3s3': 0.0},
+     'taus': array([ 1, -1,  0]),
+     'thetas': array([0.        , 1.37373734, 3.14159265]),
+     'xy_positons': array([[ 3.00000000e+00,  0.00000000e+00],
+           [ 5.87358252e-01,  2.94193988e+00],
+           [-3.00000000e+00,  3.67394040e-16]])}
+    """
     random_positioner = RandomCirclePositioner()
-    positions_info = random_positioner.get_sources_locations(4)
+    positions_info = random_positioner.get_sources_locations(3)
     from pprint import pprint
     pprint(positions_info)
+
+
+if __name__ == "__main__":
+    example_of_usage()
