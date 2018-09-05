@@ -57,8 +57,6 @@ class RandomCirclePositioner(object):
                  radius=3.0,
                  mic_distance_percentage=0.01,
                  sound_speed=343,
-                 max_mixture_ratio=0.8,
-                 min_mixture_ratio=0.2,
                  fs=16000):
         """
         :param min_angle: minimum angle in rads for the 2 sources
@@ -67,9 +65,6 @@ class RandomCirclePositioner(object):
         :param mic_distance_percentage: Percentage of the radius
         corresponding to the distance between the two microphones
         :param sound_speed: Default 343 m/s in 20oC room temperature
-
-        :param max_mixture_ratio: m2(t) = a1*s1(t+d1) + a2*s2(t+d2)
-        :param min_mixture_ratio: a1 \in Uniform[.3, .7] and a2 = 1 - a1
         :param fs: sampling ratio in Hz
         """
 
@@ -80,8 +75,6 @@ class RandomCirclePositioner(object):
         self.m1 = (-self.mic_distance / 2, 0.)
         self.m2 = (self.mic_distance / 2, 0.)
         self.sound_speed = sound_speed
-        self.min_mixture_ratio = min_mixture_ratio
-        self.max_mixture_ratio = max_mixture_ratio
         self.fs = fs
 
     @staticmethod
@@ -89,25 +82,44 @@ class RandomCirclePositioner(object):
                                 angle):
         return radius * np.cos(angle), radius * np.sin(angle)
 
-    def get_amplifier_values_for_sources(self):
-        a1 = np.random.uniform(self.min_mixture_ratio,
-                               self.max_mixture_ratio)
-        a2 = 1. - a1
-        return {"a1": a1, "a2": a2}
+    def get_amplifier_values_for_sources(self,
+                                         n_sources):
+        """
+        :return: A dictionary of all the amplitudes in order to infer
+        the final mixture depending on the weighted summation of the
+        source-signals
+        """
+        alphas = np.random.uniform(low=0.1,
+                                   high=1.0,
+                                   size=n_sources)
+        total_amplitude = sum(alphas)
+
+        return dict([("a"+str(i+1), a/total_amplitude)
+                     for (i, a) in enumerate(alphas)])
 
     def get_time_delays_for_sources(self,
-                                    distances):
-        taus = {"tau1": (distances['s1m1']-distances['s1m2']),
-                "tau2": (distances['s2m1'] - distances['s2m2'])}
+                                    distances,
+                                    n_sources):
+        taus_list = []
+        for i in np.arange(n_sources):
+            source = "s"+str(i+1)
+            taus_list.append(("tau"+str(i+1),
+                              distances[source+"m1"]
+                              - distances[source+"m2"]))
+        taus = dict(taus_list)
         for tau in taus:
             taus[tau] *= (1. * self.fs) / self.sound_speed
             taus[tau] = int(taus[tau])
 
         return taus
 
-    def compute_distances_for_sources_and_mics(self, s1, s2):
-        """! si must be in format (xi, yi)"""
-        points = {'s1': s1, 's2': s2, 'm1': self.m1, 'm2': self.m2}
+    def compute_distances_for_sources_and_mics(self,
+                                               source_points):
+        """! si \in source_points must be in format (xi, yi)
+        \:return a dictionary of all given points"""
+        points = {"m1": self.m1, "m2": self.m2}
+        points.update(dict([("s"+str(i+1), xy)
+                            for (i, xy) in enumerate(source_points)]))
         distances = {}
 
         for point_1, xy1 in points.items():
@@ -117,54 +129,53 @@ class RandomCirclePositioner(object):
         return distances
 
     def get_angles(self, n_source_pairs):
-        d_thetas = [theta for theta in
-                    np.random.uniform(low=self.min_angle,
-                                      high=self.max_angle,
-                                      size=n_source_pairs)]
+        d_thetas_list = np.random.uniform(low=self.min_angle,
+                                          high=self.max_angle,
+                                          size=n_source_pairs-1)
+        total_angle = sum(d_thetas_list)
+        if total_angle > self.max_angle:
+            d_thetas_list = [(theta * self.max_angle) / total_angle
+                             for theta in d_thetas_list]
 
-        """ Also we have to place this angle arbitrarily over the 
-        half circle in order to get the positions of the two sources"""
-        thetas1 = [np.random.uniform(low=0.0,
-                                     high=self.max_angle - d_theta)
-                   for d_theta in d_thetas]
+        thetas = [0.]
+        acc = 0.
+        for angle in d_thetas_list:
+            thetas.append(acc+angle)
+            acc += angle
 
-        thetas_1_d = zip(thetas1, d_thetas)
-        thetas_1_2 = [(theta1, theta1+d_theta)
-                      for (theta1, d_theta) in thetas_1_d]
+        return thetas, d_thetas_list
 
-        return thetas_1_2, d_thetas
-
-    def get_sources_locations(self, n_source_pairs):
+    def get_sources_locations(self,
+                              n_source_pairs):
+        """!
+        Generate the positions, angles and distances for
+        n_source_pairs of the same mixture corersponding to 2 mics"""
         thetas, d_thetas = self.get_angles(n_source_pairs)
-        xys = [(self.get_cartessian_position(self.radius, th_1),
-                self.get_cartessian_position(self.radius, th_2))
-                for (th_1, th_2) in thetas]
+        xys = []
+        for angle in thetas:
+            xys.append(self.get_cartessian_position(self.radius,
+                                                    angle))
 
-        distances = [self.compute_distances_for_sources_and_mics(s1, s2)
-                     for (s1, s2) in xys]
+        distances = self.compute_distances_for_sources_and_mics(xys)
 
-        taus = [self.get_time_delays_for_sources(loc_dists)
-                for loc_dists in distances]
+        taus = self.get_time_delays_for_sources(distances,
+                                                n_source_pairs)
 
-        mix_amplitudes = [self.get_amplifier_values_for_sources()
-                          for _ in taus]
+        mix_amplitudes = self.get_amplifier_values_for_sources(
+                              n_source_pairs)
 
-        sources_locations = [
-                             {'thetas': thetas[i],
-                              'd_theta': d_thetas[i],
-                              'xy_positons': xys[i],
-                              'distances': distances[i],
-                              'taus': taus[i],
-                              'amplitudes': mix_amplitudes[i]
-                              }
-                             for i in np.arange(len(thetas))
-        ]
+        sources_locations = {'thetas': thetas,
+                             'd_thetas': d_thetas,
+                             'xy_positons': xys,
+                             'distances': distances,
+                             'taus': taus,
+                             'amplitudes': mix_amplitudes}
 
         return sources_locations
 
 
 if __name__ == "__main__":
     random_positioner = RandomCirclePositioner()
-    positions_info = random_positioner.get_sources_locations(2)
+    positions_info = random_positioner.get_sources_locations(4)
     from pprint import pprint
     pprint(positions_info)
