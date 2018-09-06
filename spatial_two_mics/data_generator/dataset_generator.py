@@ -43,7 +43,8 @@ class RandomCombinations(ArtificialDatasetCreator):
                  audio_dataset_name="timit",
                  genders_mixtures=None,
                  excluded_speakers=None,
-                 subset_of_speakers='train'):
+                 subset_of_speakers='train',
+                 min_duration=2.0):
         super(RandomCombinations,
               self).__init__(audio_dataset_name=audio_dataset_name)
 
@@ -61,6 +62,8 @@ class RandomCombinations(ArtificialDatasetCreator):
         self.used_speakers = self.get_available_speakers(
                                   subset_of_speakers,
                                   excluded_speakers)
+
+        self.min_samples = min_duration * self.fs
 
     def get_available_speakers(self,
                                subset_of_speakers,
@@ -132,6 +135,14 @@ class RandomCombinations(ArtificialDatasetCreator):
             if len(speaker_set) < len(possible_comb):
                 continue
 
+            # check whether all the signals have the appropriate
+            # duration
+            signals = [(len(self.get_wav(speakers_dic, source_info))
+                        >= self.min_samples)
+                       for source_info in possible_comb]
+            if not all(signals):
+                continue
+
             valid_mixtures.append(possible_comb)
 
         return valid_mixtures
@@ -184,9 +195,12 @@ class RandomCombinations(ArtificialDatasetCreator):
         n_sources = len(combination_info)
         positions = positioner.get_sources_locations(n_sources)
 
-        signals = np.array([self.get_wav(speakers_dic,
-                                         source_info)
-                            for source_info in combination_info])
+        signals = [self.get_wav(speakers_dic, source_info)
+                   for source_info in combination_info]
+
+        for signal in signals:
+            if len(signal) < 2 * self.fs:
+                print(len(signal))
 
         # pprint(signals)
         return None
