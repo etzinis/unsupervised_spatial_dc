@@ -109,7 +109,7 @@ class RandomCirclePositioner(object):
         taus = dict(taus_list)
         for tau in taus:
             taus[tau] *= (1. * self.fs) / self.sound_speed
-            taus[tau] = int(taus[tau])
+            # taus[tau] = int(taus[tau])
 
         return taus
 
