@@ -12,6 +12,7 @@ import numpy as np
 from random import shuffle
 from pprint import pprint
 from torch.utils.data import Dataset, DataLoader
+from librosa.core import stft
 
 root_dir = os.path.join(
     os.path.dirname(os.path.realpath(__file__)),
@@ -182,10 +183,7 @@ class RandomCombinations(ArtificialDatasetCreator):
                 new_signal[:-delay] = 0.
             delayed_signals.append(new_signal)
 
-        pprint(signals)
-        pprint(delayed_signals)
-        pprint(delays)
-
+        return delayed_signals
 
     def construct_mixture_signals(self,
                                   source_signals,
@@ -207,7 +205,33 @@ class RandomCombinations(ArtificialDatasetCreator):
                                positions['taus'],
                                force_all_signals_delay=force_all_signals_delay)
 
-        return None, None
+        m1 = sum([positions['amplitudes'][i]*cropped_signals[i]
+                  for i in np.arange(len(cropped_signals))])
+
+        m2 = sum([positions['amplitudes'][i] * delayed_signals[i]
+                  for i in np.arange(len(delayed_signals))])
+
+        sources_spectra = [stft(s, n_fft=1024, win_length=320)
+                           for s in cropped_signals]
+
+        delayed_sources_spectra = [stft(s, n_fft=1024, win_length=320)
+                                   for s in delayed_signals]
+
+        m1_tf = stft(m1, n_fft=1024, win_length=320)
+        m2_tf = stft(m2, n_fft=1024, win_length=320)
+
+        mixture_info = {
+            'm1_raw': m1,
+            'm2_raw': m2,
+            'm1_tf': m1_tf,
+            'm2_tf': m2_tf,
+            'sources_raw': cropped_signals,
+            'sources_tf': sources_spectra,
+            'delayed_sources_raw': delayed_signals,
+            'delayed_sources_tf': delayed_sources_spectra,
+        }
+
+        return mixture_info
 
     def acquire_mixture_information(self,
                                     speakers_dic,
@@ -255,16 +279,12 @@ class RandomCombinations(ArtificialDatasetCreator):
         source_signals = [self.get_wav(speakers_dic, source_info)
                           for source_info in combination_info]
 
-        mixture1, mixture2 = self.construct_mixture_signals(
-                                  source_signals,
-                                  positions,
-                                  force_all_signals_delay=force_all_signals_delay)
+        mixture_info = self.construct_mixture_signals(
+                            source_signals,
+                            positions,
+                            force_all_signals_delay=force_all_signals_delay)
 
-        # pprint(signals)
-        return None
-
-        # pprint(combination_info)
-        return positions
+        return mixture_info
 
     def get_mixture_combinations(self,
                                  n_sources_in_mix=2,
@@ -314,7 +334,7 @@ def example_of_usage():
 
     mixture_combinations = timit_mixture_creator.get_mixture_combinations(
                            n_sources_in_mix=3,
-                           n_mixtures=100,
+                           n_mixtures=1000,
                            force_all_signals_delay=True)
 
 
