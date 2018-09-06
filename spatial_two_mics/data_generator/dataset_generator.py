@@ -19,6 +19,8 @@ root_dir = os.path.join(
 sys.path.insert(0, root_dir)
 
 import spatial_two_mics.data_loaders.timit as timit_loader
+import spatial_two_mics.data_generator.source_position_generator as \
+    positions_generator
 
 
 class ArtificialDatasetCreator(object):
@@ -30,6 +32,7 @@ class ArtificialDatasetCreator(object):
                  audio_dataset_name="timit"):
         if audio_dataset_name.lower() == "timit":
             self.data_loader = timit_loader.TimitLoader()
+            self.fs = 16000
         else:
             raise NotImplementedError("Dataset Loader: {} is not yet "
                   "implemented.".format(audio_dataset_name))
@@ -99,11 +102,6 @@ class RandomCombinations(ArtificialDatasetCreator):
             c += 1
             yield [iterable[i] for i in indexes]
 
-    def acquire_mixture_information(self,
-                                    speaker_dic,
-                                    combination_info):
-        return None
-
     def get_only_valid_mixture_combinations(self,
                                             possible_sources,
                                             speakers_dic,
@@ -124,15 +122,77 @@ class RandomCombinations(ArtificialDatasetCreator):
             genders_in_mix = [x['gender'] for x in possible_comb]
             good_gender_mix = [g in genders_in_mix
                                for g in self.genders_mixtures]
+
+            # not a valid gender
             if not all(good_gender_mix):
-                # not a valid gender
                 continue
 
-            valid_mixtures.append(self.acquire_mixture_information(
-                speakers_dic,
-                possible_comb))
+            # we do not want the same speaker twice
+            speaker_set = set([x['speaker_id'] for x in possible_comb])
+            if len(speaker_set) < len(possible_comb):
+                continue
+
+            valid_mixtures.append(possible_comb)
 
         return valid_mixtures
+
+    @staticmethod
+    def get_wav(speakers_dic,
+                source_info):
+        return speakers_dic[source_info['speaker_id']][
+               'sentences'][source_info['sentence_id']]['wav']
+
+    def acquire_mixture_information(self,
+                                    speakers_dic,
+                                    combination_info,
+                                    positioner):
+        """! The whole processing for getting the mixture signals for
+        the two mics and the positions is done here.
+
+        :param positioner should be able to return:
+               'amplitudes': array([0.28292362, 0.08583346, 0.63124292]),
+               'd_thetas': array([1.37373734, 1.76785531]),
+               'distances': {'m1m1': 0.0,
+                             'm1m2': 0.03,
+                             'm1s1': 3.015, ...
+                             's3s3': 0.0},
+               'taus': array([ 1, -1,  0]),
+               'thetas': array([0.        , 1.37373734, 3.14159265]),
+               'xy_positons': array([[ 3.00000000e+00, 0.00000000e+00],
+                   [ 5.87358252e-01,  2.94193988e+00],
+                   [-3.00000000e+00,  3.67394040e-16]])}
+
+        :param speakers_dic should be able to return a dic like this:
+                'speaker_id_i': {
+                    'dialect': which dialect the speaker belongs to,
+                    'gender': f or m,
+                    'sentences': {
+                        'sentence_id_j': {
+                            'wav': wav_on_a_numpy_matrix,
+                            'sr': Fs in Hz integer,
+                            'path': PAth of the located wav
+                        }
+                    }
+                }
+
+        :param combination_info should be in the following format:
+           [{'gender': 'm', 'sentence_id': 'sx298', 'speaker_id': 'mctt0'},
+            {'gender': 'm', 'sentence_id': 'sx364', 'speaker_id': 'mrjs0'},
+           {'gender': 'f', 'sentence_id': 'sx369', 'speaker_id': 'fgjd0'}]
+
+        """
+        n_sources = len(combination_info)
+        positions = positioner.get_sources_locations(n_sources)
+
+        signals = np.array([self.get_wav(speakers_dic,
+                                         source_info)
+                            for source_info in combination_info])
+
+        # pprint(signals)
+        return None
+
+        # pprint(combination_info)
+        return positions
 
     def get_mixture_combinations(self,
                                  n_sources_in_mix=2,
@@ -150,13 +210,18 @@ class RandomCombinations(ArtificialDatasetCreator):
         shuffle(possible_sources)
 
         valid_combinations = self.get_only_valid_mixture_combinations(
-            possible_sources,
-            speakers_dic,
-            n_mixed_sources=n_sources_in_mix,
-            n_mixtures=n_mixtures)
+                                  possible_sources,
+                                  speakers_dic,
+                                  n_mixed_sources=n_sources_in_mix,
+                                  n_mixtures=n_mixtures)
 
-        mixtures = []
-        print(len(valid_combinations))
+        random_positioner = positions_generator.RandomCirclePositioner()
+        mixtures = [self.acquire_mixture_information(speakers_dic,
+                                                     combination,
+                                                     random_positioner)
+                    for combination in valid_combinations]
+
+        print(len(mixtures))
         input()
         return mixtures
 
