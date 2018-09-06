@@ -45,6 +45,7 @@ class RandomCombinations(ArtificialDatasetCreator):
                  excluded_speakers=None,
                  subset_of_speakers='train',
                  min_duration=2.0):
+
         super(RandomCombinations,
               self).__init__(audio_dataset_name=audio_dataset_name)
 
@@ -63,7 +64,7 @@ class RandomCombinations(ArtificialDatasetCreator):
                                   subset_of_speakers,
                                   excluded_speakers)
 
-        self.min_samples = min_duration * self.fs
+        self.min_samples = int(min_duration * self.fs)
 
     def get_available_speakers(self,
                                subset_of_speakers,
@@ -153,10 +154,66 @@ class RandomCombinations(ArtificialDatasetCreator):
         return speakers_dic[source_info['speaker_id']][
                'sentences'][source_info['sentence_id']]['wav']
 
+    def construct_delayed_signals(self,
+                                  signals,
+                                  taus,
+                                  force_all_signals_delay=False):
+        """!
+        This function might extend to any real delay by interpolation
+        of the source signals
+        """
+
+        # naive way in order to force a delay for DUET algorithm
+        delays = []
+        if force_all_signals_delay:
+            delays = []
+            for tau in taus:
+                if tau >= 0:
+                    delays.append(1)
+                else:
+                    delays.append(-1)
+
+        delayed_signals = []
+        for i, delay in enumerate(delays):
+            new_signal = np.roll(signals[i], -delay)
+            if delay > 0:
+                new_signal[-delay:] = 0.
+            elif delay < 0:
+                new_signal[:-delay] = 0.
+            delayed_signals.append(new_signal)
+
+        pprint(signals)
+        pprint(delayed_signals)
+        pprint(delays)
+
+
+    def construct_mixture_signals(self,
+                                  source_signals,
+                                  positions,
+                                  force_all_signals_delay=False):
+        """!
+        This function constructs the mixture for each mic (m1,
+        m2) in the following way:
+        m1(t) = a1*s1(t) + ... + an*sn(t)
+        m2(t) = a1*s1(t+d1) + ... + an*sn(t+dn)
+
+        by also cutting them off to self.min_samples
+        """
+
+        cropped_signals = [s[:self.min_samples]
+                           for s in source_signals]
+        delayed_signals = self.construct_delayed_signals(
+                               cropped_signals,
+                               positions['taus'],
+                               force_all_signals_delay=force_all_signals_delay)
+
+        return None, None
+
     def acquire_mixture_information(self,
                                     speakers_dic,
                                     combination_info,
-                                    positioner):
+                                    positioner,
+                                    force_all_signals_delay=False):
         """! The whole processing for getting the mixture signals for
         the two mics and the positions is done here.
 
@@ -167,7 +224,7 @@ class RandomCombinations(ArtificialDatasetCreator):
                              'm1m2': 0.03,
                              'm1s1': 3.015, ...
                              's3s3': 0.0},
-               'taus': array([ 1, -1,  0]),
+               'taus': array([ 1.456332, -1.243543,  0]),
                'thetas': array([0.        , 1.37373734, 3.14159265]),
                'xy_positons': array([[ 3.00000000e+00, 0.00000000e+00],
                    [ 5.87358252e-01,  2.94193988e+00],
@@ -195,12 +252,13 @@ class RandomCombinations(ArtificialDatasetCreator):
         n_sources = len(combination_info)
         positions = positioner.get_sources_locations(n_sources)
 
-        signals = [self.get_wav(speakers_dic, source_info)
-                   for source_info in combination_info]
+        source_signals = [self.get_wav(speakers_dic, source_info)
+                          for source_info in combination_info]
 
-        for signal in signals:
-            if len(signal) < 2 * self.fs:
-                print(len(signal))
+        mixture1, mixture2 = self.construct_mixture_signals(
+                                  source_signals,
+                                  positions,
+                                  force_all_signals_delay=force_all_signals_delay)
 
         # pprint(signals)
         return None
@@ -210,7 +268,8 @@ class RandomCombinations(ArtificialDatasetCreator):
 
     def get_mixture_combinations(self,
                                  n_sources_in_mix=2,
-                                 n_mixtures=0):
+                                 n_mixtures=0,
+                                 force_all_signals_delay=False):
         speakers_dic = self.data_dic[self.subset_of_speakers]
         possible_sources = []
         for speaker in self.used_speakers:
@@ -230,9 +289,11 @@ class RandomCombinations(ArtificialDatasetCreator):
                                   n_mixtures=n_mixtures)
 
         random_positioner = positions_generator.RandomCirclePositioner()
-        mixtures = [self.acquire_mixture_information(speakers_dic,
-                                                     combination,
-                                                     random_positioner)
+        mixtures = [self.acquire_mixture_information(
+                         speakers_dic,
+                         combination,
+                         random_positioner,
+                         force_all_signals_delay=force_all_signals_delay)
                     for combination in valid_combinations]
 
         print(len(mixtures))
@@ -253,7 +314,8 @@ def example_of_usage():
 
     mixture_combinations = timit_mixture_creator.get_mixture_combinations(
                            n_sources_in_mix=3,
-                           n_mixtures=10000)
+                           n_mixtures=100,
+                           force_all_signals_delay=True)
 
 
 if __name__ == "__main__":

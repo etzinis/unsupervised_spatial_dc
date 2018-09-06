@@ -153,8 +153,7 @@ class RandomCirclePositioner(object):
         thetas, d_thetas = self.get_angles(n_source_pairs)
         xys = []
         for angle in thetas:
-            xys.append(self.get_cartessian_position(self.radius,
-                                                    angle))
+            xys.append(self.get_cartessian_position(self.radius, angle))
 
         distances = self.compute_distances_for_sources_and_mics(xys)
 
