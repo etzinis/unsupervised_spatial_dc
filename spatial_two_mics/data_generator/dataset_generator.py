@@ -3,7 +3,7 @@
 mixtures form the dataset and also store them inside a specified folder
 
 @author Efthymios Tzinis {etzinis2@illinois.edu}
-@copyright University of illinois at Urbana Champaign
+@copyright University of Illinois at Urbana Champaign
 """
 
 import os
@@ -11,8 +11,6 @@ import sys
 import numpy as np
 from random import shuffle
 from pprint import pprint
-from torch.utils.data import Dataset, DataLoader
-from librosa.core import stft
 
 root_dir = os.path.join(
     os.path.dirname(os.path.realpath(__file__)),
@@ -220,7 +218,7 @@ class RandomCombinations(ArtificialDatasetCreator):
                                            comb)})
 
         return {'positions': positions,
-                'source_ids': new_combs_info}
+                'sources_ids': new_combs_info}
 
 
     def get_mixture_combinations(self,
@@ -276,8 +274,6 @@ class RandomCombinations(ArtificialDatasetCreator):
                                                          combination)))
                          for combination in valid_combinations]
 
-        pprint(mixtures_info)
-
         input("Before creating the mixtures...")
 
         # mixtures = [self.acquire_mixture_information(
@@ -305,7 +301,7 @@ def example_of_usage():
 
     mixture_combinations = timit_mixture_creator.get_mixture_combinations(
                            n_sources_in_mix=2,
-                           n_mixtures=1,
+                           n_mixtures=30000,
                            force_all_signals_delay=True)
 
 
