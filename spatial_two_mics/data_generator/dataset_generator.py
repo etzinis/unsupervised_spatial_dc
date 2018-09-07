@@ -22,6 +22,8 @@ sys.path.insert(0, root_dir)
 import spatial_two_mics.data_loaders.timit as timit_loader
 import spatial_two_mics.data_generator.source_position_generator as \
     positions_generator
+import spatial_two_mics.utils.audio_mixture_constructor as \
+    mixture_constructor
 
 
 class ArtificialDatasetCreator(object):
@@ -155,93 +157,18 @@ class RandomCombinations(ArtificialDatasetCreator):
         return speakers_dic[source_info['speaker_id']][
                'sentences'][source_info['sentence_id']]['wav']
 
-    def construct_delayed_signals(self,
-                                  signals,
-                                  taus,
-                                  force_all_signals_delay=False):
-        """!
-        This function might extend to any real delay by interpolation
-        of the source signals
+    @staticmethod
+    def get_wav_path(speakers_dic,
+                source_info):
+        return speakers_dic[source_info['speaker_id']][
+            'sentences'][source_info['sentence_id']]['path']
+
+    def construct_mixture_info(self,
+                               speakers_dic,
+                               combination_info,
+                               positions):
         """
-
-        # naive way in order to force a delay for DUET algorithm
-        delays = []
-        if force_all_signals_delay:
-            delays = []
-            for tau in taus:
-                if tau >= 0:
-                    delays.append(1)
-                else:
-                    delays.append(-1)
-
-        delayed_signals = []
-        for i, delay in enumerate(delays):
-            new_signal = np.roll(signals[i], -delay)
-            if delay > 0:
-                new_signal[-delay:] = 0.
-            elif delay < 0:
-                new_signal[:-delay] = 0.
-            delayed_signals.append(new_signal)
-
-        return delayed_signals
-
-    def construct_mixture_signals(self,
-                                  source_signals,
-                                  positions,
-                                  force_all_signals_delay=False):
-        """!
-        This function constructs the mixture for each mic (m1,
-        m2) in the following way:
-        m1(t) = a1*s1(t) + ... + an*sn(t)
-        m2(t) = a1*s1(t+d1) + ... + an*sn(t+dn)
-
-        by also cutting them off to self.min_samples
-        """
-
-        cropped_signals = [s[:self.min_samples]
-                           for s in source_signals]
-        delayed_signals = self.construct_delayed_signals(
-                               cropped_signals,
-                               positions['taus'],
-                               force_all_signals_delay=force_all_signals_delay)
-
-        m1 = sum([positions['amplitudes'][i]*cropped_signals[i]
-                  for i in np.arange(len(cropped_signals))])
-
-        m2 = sum([positions['amplitudes'][i] * delayed_signals[i]
-                  for i in np.arange(len(delayed_signals))])
-
-        sources_spectra = [stft(s, n_fft=1024, win_length=320)
-                           for s in cropped_signals]
-
-        delayed_sources_spectra = [stft(s, n_fft=1024, win_length=320)
-                                   for s in delayed_signals]
-
-        m1_tf = stft(m1, n_fft=1024, win_length=320)
-        m2_tf = stft(m2, n_fft=1024, win_length=320)
-
-        mixture_info = {
-            'm1_raw': m1,
-            'm2_raw': m2,
-            'm1_tf': m1_tf,
-            'm2_tf': m2_tf,
-            'sources_raw': cropped_signals,
-            'sources_tf': sources_spectra,
-            'delayed_sources_raw': delayed_signals,
-            'delayed_sources_tf': delayed_sources_spectra,
-        }
-
-        return mixture_info
-
-    def acquire_mixture_information(self,
-                                    speakers_dic,
-                                    combination_info,
-                                    positioner,
-                                    force_all_signals_delay=False):
-        """! The whole processing for getting the mixture signals for
-        the two mics and the positions is done here.
-
-        :param positioner should be able to return:
+        :param positions should be able to return:
                'amplitudes': array([0.28292362, 0.08583346, 0.63124292]),
                'd_thetas': array([1.37373734, 1.76785531]),
                'distances': {'m1m1': 0.0,
@@ -272,24 +199,55 @@ class RandomCombinations(ArtificialDatasetCreator):
             {'gender': 'm', 'sentence_id': 'sx364', 'speaker_id': 'mrjs0'},
            {'gender': 'f', 'sentence_id': 'sx369', 'speaker_id': 'fgjd0'}]
 
+        :return condensed mixture information block:
+        {
+            'postions':postions (argument)
+            'sources_ids':
+            [       {
+                        'gender': combination_info.gender
+                        'sentence_id': combination_info.sentence_id
+                        'speaker_id': combination_info.speaker_id
+                        'wav_path': the wav_path for the file
+                    } ... ]
+        }
         """
-        n_sources = len(combination_info)
-        positions = positioner.get_sources_locations(n_sources)
 
-        source_signals = [self.get_wav(speakers_dic, source_info)
-                          for source_info in combination_info]
+        new_combs_info = combination_info.copy()
 
-        mixture_info = self.construct_mixture_signals(
-                            source_signals,
-                            positions,
-                            force_all_signals_delay=force_all_signals_delay)
+        for comb in new_combs_info:
+            comb.update({'wav_path':
+                         self.get_wav_path(speakers_dic,
+                                           comb)})
 
-        return mixture_info
+        return {'positions': positions,
+                'source_ids': new_combs_info}
+
 
     def get_mixture_combinations(self,
                                  n_sources_in_mix=2,
                                  n_mixtures=0,
                                  force_all_signals_delay=False):
+        """
+        speakers_dic should be able to return a dic like this:
+            'speaker_id_i': {
+                'dialect': which dialect the speaker belongs to,
+                'gender': f or m,
+                'sentences': {
+                    'sentence_id_j': {
+                        'wav': wav_on_a_numpy_matrix,
+                        'sr': Fs in Hz integer,
+                        'path': PAth of the located wav
+                    }
+                }
+            }
+
+        combination_info should be in the following format:
+           [{'gender': 'm', 'sentence_id': 'sx298', 'speaker_id': 'mctt0'},
+            {'gender': 'm', 'sentence_id': 'sx364', 'speaker_id': 'mrjs0'},
+           {'gender': 'f', 'sentence_id': 'sx369', 'speaker_id': 'fgjd0'}]
+
+        """
+
         speakers_dic = self.data_dic[self.subset_of_speakers]
         possible_sources = []
         for speaker in self.used_speakers:
@@ -309,16 +267,29 @@ class RandomCombinations(ArtificialDatasetCreator):
                                   n_mixtures=n_mixtures)
 
         random_positioner = positions_generator.RandomCirclePositioner()
-        mixtures = [self.acquire_mixture_information(
+
+
+        mixtures_info = [self.construct_mixture_info(
                          speakers_dic,
                          combination,
-                         random_positioner,
-                         force_all_signals_delay=force_all_signals_delay)
-                    for combination in valid_combinations]
+                         random_positioner.get_sources_locations(len(
+                                                         combination)))
+                         for combination in valid_combinations]
 
-        print(len(mixtures))
-        input()
-        return mixtures
+        pprint(mixtures_info)
+
+        input("Before creating the mixtures...")
+
+        # mixtures = [self.acquire_mixture_information(
+        #                  speakers_dic,
+        #                  combination,
+        #                  random_positioner.get_sources_locations(len(
+        #                                                  combination)),
+        #                  force_all_signals_delay=force_all_signals_delay)
+        #             for combination in valid_combinations]
+
+        # print(len(mixtures))
+        return None
 
 
 def example_of_usage():
@@ -333,8 +304,8 @@ def example_of_usage():
                             excluded_speakers=['mwew0'])
 
     mixture_combinations = timit_mixture_creator.get_mixture_combinations(
-                           n_sources_in_mix=3,
-                           n_mixtures=1000,
+                           n_sources_in_mix=2,
+                           n_mixtures=1,
                            force_all_signals_delay=True)
 
 
