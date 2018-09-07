@@ -18,7 +18,7 @@ class AudioMixtureConstructor(object):
                  n_fft=1024,
                  win_len=None,
                  hop_len=None,
-                 force_all_signals_integer_delay=False,
+                 force_all_signals_one_sample_delay=False,
                  normalize_audio_by_std=True,
                  mixture_duration=2.0):
         """
@@ -29,8 +29,8 @@ class AudioMixtureConstructor(object):
         If unspecified, defaults to win_length = n_fft.
         :param hop_len: number audio of frames between STFT columns.
         If unspecified, defaults win_length / 4.
-        :param force_all_signals_integer_delay: if true then forces a
-        -1, 0 , 1 integer delay for the microphones mixtures
+        :param force_all_signals_one_sample_delay: if true then forces a
+        -1 or 1 integer delay for the microphones mixtures
         :param normalize_audio_by_std: if the loaded wavs would be
         normalized by their std values
         :param mixture_duration: the duration on which the mixture
@@ -41,6 +41,8 @@ class AudioMixtureConstructor(object):
         self.win_len = win_len
         self.hop_len = hop_len
         self.normalize_audio_by_std = normalize_audio_by_std
+        self.force_all_signals_one_sample_delay =  \
+            force_all_signals_one_sample_delay
 
     @staticmethod
     def load_wav(source_info):
@@ -54,25 +56,22 @@ class AudioMixtureConstructor(object):
                     win_length=self.win_len,
                     hop_length=self.hop_len)
 
-    @staticmethod
-    def construct_delayed_signals(signals,
-                                  taus,
-                                  force_all_signals_delay=False):
+    def construct_delayed_signals(self,
+                                  signals,
+                                  taus):
         """!
         This function might extend to any real delay by interpolation
         of the source signals
         """
 
         # naive way in order to force a delay for DUET algorithm
-        if force_all_signals_delay:
+        if self.force_all_signals_one_sample_delay:
             delays = []
-            if force_all_signals_delay:
-                delays = []
-                for tau in taus:
-                    if tau >= 0:
-                        delays.append(1)
-                    else:
-                        delays.append(-1)
+            for tau in taus:
+                if tau >= 0:
+                    delays.append(1)
+                else:
+                    delays.append(-1)
         else:
             raise NotImplementedError("A real value delay should be "
                                       "implemented by utilizing "
@@ -91,8 +90,7 @@ class AudioMixtureConstructor(object):
         return delayed_signals
 
     def get_tf_representations(self,
-                               mixture_info,
-                               force_all_signals_delay=False):
+                               mixture_info):
         """!
         This function constructs the mixture for each mic (m1,
         m2) in the following way:
@@ -100,6 +98,24 @@ class AudioMixtureConstructor(object):
         m2(t) = a1*s1(t+d1) + ... + an*sn(t+dn)
 
         by also cutting them off to self.min_samples
+
+        :return
+        mixture_info = {
+            'm1_raw': numpy array containing the raw m1 signal,
+            'm2_raw': numpy array containing the raw m2 signal,
+            'm1_tf': numpy array containing the m1 TF representation,
+            'm2_tf': numpy array containing the m2 TF representation,
+            'sources_raw': a list of numpy 1d vectors containing the
+            sources ,
+            'sources_tf': a list of numpy 2d vectors containing the
+             TF represeantations of the sources ,
+            'delayed_sources_raw': a list of numpy 1d vectors containing
+            the sources delayed with some tau,
+            'delayed_sources_tf': a list of numpy 2d vectors
+            containing the TF representations of the delayed signals,
+            'amplitudes': the weights that each source contributes to
+            the mixture of the second microphone
+        }
         """
         positions = mixture_info['positions']
         source_signals = [(s['wav'], s['fs'])
@@ -109,8 +125,7 @@ class AudioMixtureConstructor(object):
                            for (s, fs) in source_signals]
         delayed_signals = self.construct_delayed_signals(
             cropped_signals,
-            positions['taus'],
-            force_all_signals_delay=force_all_signals_delay)
+            positions['taus'])
 
         m1 = sum([positions['amplitudes'][i] * cropped_signals[i]
                   for i in np.arange(len(cropped_signals))])
@@ -141,8 +156,7 @@ class AudioMixtureConstructor(object):
         return mixture_info
 
     def construct_mixture(self,
-                          mixture_info,
-                          force_all_signals_delay=False):
+                          mixture_info):
         """! The whole processing for getting the mixture signals for
         the two mics and the positions is done here.
 
@@ -158,12 +172,24 @@ class AudioMixtureConstructor(object):
                     } ... ]
         }
 
-        :param force_all_signals_delay whether you need to force an
-        integer delay of -1, 0, 1
 
-        :return
+        :return tf_representations = {
+            'm1_raw': numpy array containing the raw m1 signal,
+            'm2_raw': numpy array containing the raw m2 signal,
+            'm1_tf': numpy array containing the m1 TF representation,
+            'm2_tf': numpy array containing the m2 TF representation,
+            'sources_raw': a list of numpy 1d vectors containing the
+            sources ,
+            'sources_tf': a list of numpy 2d vectors containing the
+             TF represeantations of the sources ,
+            'delayed_sources_raw': a list of numpy 1d vectors containing
+            the sources delayed with some tau,
+            'delayed_sources_tf': a list of numpy 2d vectors
+            containing the TF representations of the delayed signals,
+            'amplitudes': the weights that each source contributes to
+            the mixture of the second microphone
+        }
         """
-        n_sources = len(mixture_info['sources_ids'])
 
         for i, source_info in enumerate(mixture_info['sources_ids']):
             fs, wav = self.load_wav(source_info)
@@ -172,10 +198,7 @@ class AudioMixtureConstructor(object):
             mixture_info['sources_ids'][i]['fs'] = int(fs)
             mixture_info['sources_ids'][i]['wav'] = wav
 
-        tf_representations = self.get_tf_representations(
-            mixture_info,
-            force_all_signals_delay=force_all_signals_delay
-        )
+        tf_representations = self.get_tf_representations(mixture_info)
 
         return tf_representations
 
@@ -195,13 +218,12 @@ def example_of_usage():
     mixture_creator = AudioMixtureConstructor(n_fft=1024,
                                               win_len=1024,
                                               hop_len=512,
-                                              mixture_duration=2.0)
+                                              mixture_duration=2.0,
+                                              force_all_signals_one_sample_delay=True)
 
-    example_mixture_info = me.mixture_info_example()
+    mixture_info = me.mixture_info_example()
 
-    tf_mixtures = mixture_creator.construct_mixture(
-                                  example_mixture_info,
-                                  force_all_signals_delay=True)
+    tf_mixtures = mixture_creator.construct_mixture(mixture_info)
 
     pprint(tf_mixtures)
 
