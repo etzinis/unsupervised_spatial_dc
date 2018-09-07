@@ -4,7 +4,7 @@ construct audio mixtures
 
 
 @author Efthymios Tzinis {etzinis2@illinois.edu}
-@copyright University of illinois at Urbana Champaign
+@copyright University of Illinois at Urbana Champaign
 """
 
 from librosa.core import stft
@@ -135,6 +135,7 @@ class AudioMixtureConstructor(object):
             'sources_tf': sources_spectra,
             'delayed_sources_raw': delayed_signals,
             'delayed_sources_tf': delayed_sources_spectra,
+            'amplitudes': positions['amplitudes']
         }
 
         return mixture_info
