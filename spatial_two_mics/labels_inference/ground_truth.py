@@ -7,6 +7,7 @@ maximum energy of the sources in each bin
 """
 
 import numpy as np
+from pprint import pprint
 
 
 def infer_mask(mixture_info):
@@ -51,7 +52,20 @@ def infer_mask(mixture_info):
                                  "".format([x.shape for x in
                                             sources_complex_spectra])
 
-    return "Psolos"
-    # mixture_tensor = np.dstack()
+    sources_complex_spectra = [amplitudes[i] * sources_complex_spectra[i]
+                               for i in np.arange(n_sources)]
+
+    tf_real_sources = [np.abs(tf_complex)
+                       for tf_complex in sources_complex_spectra]
+
+    mixture_tensor = np.dstack(tf_real_sources)
+    dominating_source = np.argmax(mixture_tensor, axis=2)
+
+    zipped_tf_labels = dominating_source.astype(np.uint8)
+
+    assert np.array_equal(dominating_source, zipped_tf_labels), \
+        "Zipping the numpy matrix should not yield different labels"
+
+    return zipped_tf_labels
 
 
