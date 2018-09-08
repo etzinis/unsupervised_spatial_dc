@@ -138,8 +138,8 @@ class AudioMixtureConstructor(object):
         delayed_sources_spectra = [self.get_stft(s)
                                    for s in delayed_signals]
 
-        m1_tf = stft(m1, n_fft=1024, win_length=320)
-        m2_tf = stft(m2, n_fft=1024, win_length=320)
+        m1_tf = self.get_stft(m1)
+        m2_tf = self.get_stft(m2)
 
         mixture_info = {
             'm1_raw': m1,
