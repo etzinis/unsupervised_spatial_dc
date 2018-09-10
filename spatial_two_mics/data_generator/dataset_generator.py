@@ -6,6 +6,7 @@ mixtures form the dataset and also store them inside a specified folder
 @copyright University of Illinois at Urbana Champaign
 """
 
+import argparse
 import os
 import sys
 import numpy as np
@@ -288,23 +289,53 @@ class RandomCombinations(ArtificialDatasetCreator):
         return None
 
 
-def example_of_usage():
+def example_of_usage(args):
     """!
     Creates a list of mixtures in appropriate format with all the
     information that might be needed next"""
 
     timit_mixture_creator = RandomCombinations(
-                            audio_dataset_name="timit",
-                            genders_mixtures=['m', 'f'],
-                            subset_of_speakers='test',
-                            excluded_speakers=['mwew0'])
+                            audio_dataset_name=args.dataset,
+                            genders_mixtures=args.genders,
+                            subset_of_speakers=args.speakers_subset,
+                            excluded_speakers=[])
 
     mixture_combinations = timit_mixture_creator.get_mixture_combinations(
-                           n_sources_in_mix=2,
-                           n_mixtures=30000,
-                           force_all_signals_delay=True)
+                           n_sources_in_mix=args.n_sources,
+                           n_mixtures=args.n_samples,
+                           force_all_signals_delay=args.force_integer_delay)
+
+
+def get_args():
+    """! Command line parser """
+    parser = argparse.ArgumentParser(description='Mixture dataset '
+                                                 'creator')
+    parser.add_argument("--dataset", type=str,
+                        help="Dataset name", default="timit")
+    parser.add_argument("--n_sources", type=int,
+                        help="How many sources in each mix", default=2)
+    parser.add_argument("--n_samples", type=int,
+                        help="How many samples do u want to be "
+                             "created",
+                        default=10)
+    parser.add_argument("--speakers_subset", type=str,
+                        help="test or train", default="train")
+    parser.add_argument("--genders", type=str, nargs='+',
+                        help="Genders that will correspond to the "
+                             "genders in the mixtures",
+                        default=['m', 'f'])
+    parser.add_argument("-o", "--output_path", type=str,
+                        help="""The path that the resulting dataset 
+                        would be stored""",
+                        required=True)
+    parser.add_argument("-f", "--force_integer_delay",
+                        help="""Whether you want to force an integer 
+                        delay of +- 1 in the sources.""",
+                        action="store_true")
+    return parser.parse_args()
 
 
 if __name__ == "__main__":
-    example_of_usage()
+    args = get_args()
+    example_of_usage(args)
 
