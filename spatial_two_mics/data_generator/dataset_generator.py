@@ -44,7 +44,7 @@ class RandomCombinations(ArtificialDatasetCreator):
     def __init__(self,
                  audio_dataset_name="timit",
                  genders_mixtures=None,
-                 excluded_speakers=None,
+                 create_val_set=False,
                  subset_of_speakers='train',
                  min_duration=2.0):
 
@@ -54,23 +54,32 @@ class RandomCombinations(ArtificialDatasetCreator):
         self.data_dic = self.data_loader.load()
         self.subset_of_speakers = subset_of_speakers
 
-        if excluded_speakers is None:
-            excluded_speakers = []
-
         self.genders_mixtures = genders_mixtures
         valid_genders = [(g in ['f', 'm'])
                          for g in self.genders_mixtures]
         assert valid_genders, ('Valid genders for mixtures are f and m')
 
         self.used_speakers = self.get_available_speakers(
-                                  subset_of_speakers,
-                                  excluded_speakers)
+                                  subset_of_speakers)
+        print("All Available Speakers are {}".format(
+            len(self.used_speakers)
+        ))
+
+        if create_val_set:
+            n_available = len(self.used_speakers)
+            self.val_speakers = np.random.choice(self.used_speakers,
+                                                 int(n_available/2),
+                                                 replace=False)
+        else:
+            self.val_speakers = []
+
+        self.used_speakers = [s for s in self.used_speakers
+                              if s not in self.val_speakers]
 
         self.min_samples = int(min_duration * self.fs)
 
     def get_available_speakers(self,
-                               subset_of_speakers,
-                               excluded_speakers):
+                               subset_of_speakers):
         try:
             available_speakers = sorted(list(self.data_dic[
                                                  subset_of_speakers].keys()))
@@ -81,9 +90,8 @@ class RandomCombinations(ArtificialDatasetCreator):
         valid_speakers = []
         for speaker in available_speakers:
 
-            if ((speaker not in excluded_speakers) and
-                    (self.data_dic[subset_of_speakers][
-                         speaker]['gender'] in self.genders_mixtures)):
+            if ((self.data_dic[subset_of_speakers][speaker]['gender']
+                 in self.genders_mixtures)):
                 valid_speakers.append(speaker)
 
         return valid_speakers
@@ -221,11 +229,11 @@ class RandomCombinations(ArtificialDatasetCreator):
         return {'positions': positions,
                 'sources_ids': new_combs_info}
 
-
-    def get_mixture_combinations(self,
-                                 n_sources_in_mix=2,
-                                 n_mixtures=0,
-                                 force_all_signals_delay=False):
+    def gather_mixtures_information(self,
+                                    speakers,
+                                    n_sources_in_mix=2,
+                                    n_mixtures=0,
+                                    force_all_signals_delay=False):
         """
         speakers_dic should be able to return a dic like this:
             'speaker_id_i': {
@@ -246,10 +254,10 @@ class RandomCombinations(ArtificialDatasetCreator):
            {'gender': 'f', 'sentence_id': 'sx369', 'speaker_id': 'fgjd0'}]
 
         """
-
         speakers_dic = self.data_dic[self.subset_of_speakers]
+
         possible_sources = []
-        for speaker in self.used_speakers:
+        for speaker in speakers:
             sentences = list(speakers_dic[speaker]['sentences'].keys())
             gender = speakers_dic[speaker]['gender']
             possible_sources += [{'speaker_id': speaker,
@@ -260,22 +268,49 @@ class RandomCombinations(ArtificialDatasetCreator):
         shuffle(possible_sources)
 
         valid_combinations = self.get_only_valid_mixture_combinations(
-                                  possible_sources,
-                                  speakers_dic,
-                                  n_mixed_sources=n_sources_in_mix,
-                                  n_mixtures=n_mixtures)
+            possible_sources,
+            speakers_dic,
+            n_mixed_sources=n_sources_in_mix,
+            n_mixtures=n_mixtures)
 
         random_positioner = positions_generator.RandomCirclePositioner()
 
-
         mixtures_info = [self.construct_mixture_info(
-                         speakers_dic,
-                         combination,
-                         random_positioner.get_sources_locations(len(
-                                                         combination)))
-                         for combination in valid_combinations]
+            speakers_dic,
+            combination,
+            random_positioner.get_sources_locations(len(
+                combination)))
+            for combination in valid_combinations]
 
-        input("Before creating the mixtures...")
+        return mixtures_info
+
+    def get_mixture_combinations(self,
+                                 n_sources_in_mix=2,
+                                 n_mixtures=0,
+                                 force_all_signals_delay=False):
+
+        mixtures_info = self.gather_mixtures_information(
+                        self.used_speakers,
+                        n_sources_in_mix=n_sources_in_mix,
+                        n_mixtures=n_mixtures,
+                        force_all_signals_delay=False)
+
+        import spatial_two_mics.utils.audio_mixture_constructor as \
+            mix_constructor
+        mixture_creator = mix_constructor.AudioMixtureConstructor(
+            n_fft=512, win_len=512, hop_len=256, mixture_duration=2.0,
+            force_all_signals_one_sample_delay=True)
+
+        import time
+        before = time.time()
+        tf_mixtures = [mixture_creator.construct_mixture(mi)
+                       for mi in mixtures_info]
+        now = time.time()
+
+        print("For {} mixtures creation it took: {} seconds".format(
+            len(mixtures_info), now-before
+        ))
+        # input("Before creating the mixtures...")
 
         # mixtures = [self.acquire_mixture_information(
         #                  speakers_dic,
@@ -298,7 +333,7 @@ def example_of_usage(args):
                             audio_dataset_name=args.dataset,
                             genders_mixtures=args.genders,
                             subset_of_speakers=args.speakers_subset,
-                            excluded_speakers=[])
+                            create_val_set=args.val_set)
 
     mixture_combinations = timit_mixture_creator.get_mixture_combinations(
                            n_sources_in_mix=args.n_sources,
@@ -326,12 +361,20 @@ def get_args():
                         default=['m', 'f'])
     parser.add_argument("-o", "--output_path", type=str,
                         help="""The path that the resulting dataset 
-                        would be stored""",
+                        would be stored. If the folder does not 
+                        exist it will be created as well as its 
+                        child folders train or test and val if it is 
+                        selected""",
                         required=True)
     parser.add_argument("-f", "--force_integer_delay",
                         help="""Whether you want to force an integer 
                         delay of +- 1 in the sources.""",
                         action="store_true")
+    parser.add_argument('--val_set', action="store_true",
+                        help='Force to create a separate val folder '
+                             'with the same amount of the mixtures as '
+                             'the initial test/train folder but using '
+                             'half of the available speakers')
     return parser.parse_args()
 
 
