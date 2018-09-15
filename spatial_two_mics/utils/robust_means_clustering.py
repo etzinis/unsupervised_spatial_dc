@@ -12,7 +12,7 @@ from sklearn.cluster import KMeans
 import numpy as np
 
 
-class RobustClustering(object):
+class RobustKmeans(object):
     def __init__(self,
                  n_true_clusters=2,
                  n_used_clusters=4):
@@ -34,7 +34,7 @@ class RobustClustering(object):
         self.kmeans_obj = KMeans(n_clusters=self.N_used,
                                  random_state=7)
 
-    def robust_kmeans(self, x):
+    def fit(self, x):
         """!
         robust clustering for the input x
 
@@ -73,19 +73,14 @@ def example_of_usage():
     x = data.data
     y = data.target
 
-    robust_clusterer = RobustClustering(n_true_clusters=3,
-                                        n_used_clusters=3)
-    pred = robust_clusterer.robust_kmeans(x)
+    robust_clusterer = RobustKmeans(n_true_clusters=3,
+                                    n_used_clusters=3)
+    pred = robust_clusterer.fit(x)
     print("Using 3 True Clusters and 3 for Prediction: {}".format(pred))
 
-    robust_clusterer = RobustClustering(n_true_clusters=3,
-                                       n_used_clusters=5)
-    pred = robust_clusterer.robust_kmeans(x)
-    print("Using 3 True Clusters and 3 for Prediction: {}".format(pred))
-
-    robust_clusterer = RobustClustering(n_true_clusters=3,
-                                       n_used_clusters=10)
-    pred = robust_clusterer.robust_kmeans(x)
+    robust_clusterer = RobustKmeans(n_true_clusters=3,
+                                    n_used_clusters=5)
+    pred = robust_clusterer.fit(x)
     print("Using 3 True Clusters and 3 for Prediction: {}".format(pred))
 
 if __name__ == "__main__":
