@@ -8,6 +8,7 @@
 
 import numpy as np
 from scipy.spatial import distance as dst
+from pprint import pprint
 
 
 class RandomCirclePositioner(object):
@@ -100,16 +101,19 @@ class RandomCirclePositioner(object):
     def get_time_delays_for_sources(self,
                                     distances,
                                     n_sources):
+        # delays are always computed using the m1 microphone as
+        # reference and comparing to the time delay from m2
+
         taus_list = []
         for i in np.arange(n_sources):
             source = "s"+str(i+1)
             taus_list.append(("tau"+str(i+1),
                               distances[source+"m1"]
                               - distances[source+"m2"]))
+
         taus = dict(taus_list)
         for tau in taus:
             taus[tau] *= (1. * self.fs) / self.sound_speed
-            # taus[tau] = int(taus[tau])
 
         return taus
 
@@ -190,8 +194,7 @@ def example_of_usage():
            [-3.00000000e+00,  3.67394040e-16]])}
     """
     random_positioner = RandomCirclePositioner()
-    positions_info = random_positioner.get_sources_locations(3)
-    from pprint import pprint
+    positions_info = random_positioner.get_sources_locations(2)
     pprint(positions_info)
 
 
