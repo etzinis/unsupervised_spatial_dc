@@ -90,7 +90,7 @@ class RandomCirclePositioner(object):
         the final mixture depending on the weighted summation of the
         source-signals
         """
-        alphas = np.random.uniform(low=0.1,
+        alphas = np.random.uniform(low=0.2,
                                    high=1.0,
                                    size=n_sources)
         total_amplitude = sum(alphas)
