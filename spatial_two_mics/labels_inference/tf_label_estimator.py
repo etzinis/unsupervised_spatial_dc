@@ -6,6 +6,7 @@ Algorithms or even the energy in each bin (Ground Truth).
 @copyright University of Illinois at Urbana Champaign
 """
 
+import numpy as np
 import os
 import sys
 from pprint import pprint
@@ -15,6 +16,8 @@ root_dir = os.path.join(
     '../../')
 sys.path.insert(0, root_dir)
 import spatial_two_mics.labels_inference.ground_truth as gt_inference
+import spatial_two_mics.labels_inference.duet_mask_estimation as \
+    duet_kmeans_inference
 
 
 class TFMaskEstimator(object):
@@ -27,6 +30,8 @@ class TFMaskEstimator(object):
                  inference_method=None):
         if inference_method.lower() == "ground_truth":
             self.label_inference = gt_inference
+        elif inference_method.lower() == "duet_kmeans":
+            self.label_inference = duet_kmeans_inference
         else:
             raise NotImplementedError("Inference Method: {} is not yet "
                   "implemented.".format(inference_method))
@@ -81,10 +86,24 @@ def example_of_usage():
     tf_mixtures = mixture_creator.construct_mixture(mixture_info)
 
     ground_truth_estimator = TFMaskEstimator(
-                             inference_method='Ground_truth')
+                             inference_method='duet_Kmeans')
 
     tf_labels = ground_truth_estimator.infer_mixture_labels(tf_mixtures)
-    pprint(tf_labels)
+    print("DUET Kmeans")
+    pprint(tf_labels.shape)
+
+    ground_truth_estimator = TFMaskEstimator(
+        inference_method='ground_truth')
+
+    gt_labels = ground_truth_estimator.infer_mixture_labels(tf_mixtures)
+    print("Ground Truth")
+    pprint(gt_labels.shape)
+
+    n_bins = np.product(gt_labels.shape)
+    print("Estimation differs at {} out of {} points".format(
+          min(np.count_nonzero(abs(gt_labels-tf_labels)),
+              n_bins - np.count_nonzero(abs(gt_labels - tf_labels))),
+          n_bins))
 
 
 if __name__ == "__main__":
