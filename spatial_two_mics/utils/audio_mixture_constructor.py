@@ -125,7 +125,6 @@ class AudioMixtureConstructor(object):
                            for (s, fs) in source_signals]
         n_sources = len(cropped_signals)
 
-        self.force_no_delay = True
         mic_signals = self.construct_delayed_signals(cropped_signals,
                                                      positions['taus'])
 
