@@ -64,8 +64,7 @@ class RandomCombinations(ArtificialDatasetCreator):
         self.used_speakers = self.get_available_speakers(
                                   subset_of_speakers)
         print("All Available Speakers are {}".format(
-            len(self.used_speakers)
-        ))
+            len(self.used_speakers)))
 
         if create_val_set:
             n_available = len(self.used_speakers)
@@ -234,8 +233,7 @@ class RandomCombinations(ArtificialDatasetCreator):
     def gather_mixtures_information(self,
                                     speakers,
                                     n_sources_in_mix=2,
-                                    n_mixtures=0,
-                                    force_delays=None):
+                                    n_mixtures=0):
         """
         speakers_dic should be able to return a dic like this:
             'speaker_id_i': {
@@ -293,26 +291,23 @@ class RandomCombinations(ArtificialDatasetCreator):
                                     soft_label_estimator=None):
         tf_mixture = mixture_creator.construct_mixture(mixture_info)
         gt_mask = ground_truth_estimator.infer_mixture_labels(tf_mixture)
-        del tf_mixture
         mixture_info['ground_truth_mask'] = gt_mask
         return mixture_info
 
     def get_mixture_combinations(self,
+                                 speakers,
                                  n_sources_in_mix=2,
                                  n_mixtures=0,
                                  force_delays=None,
                                  get_only_ground_truth=False):
 
-        input("Before doing Anything...")
-
         mixtures_info = self.gather_mixtures_information(
-                        self.used_speakers,
+                        speakers,
                         n_sources_in_mix=n_sources_in_mix,
-                        n_mixtures=n_mixtures,
-                        force_delays=force_delays)
+                        n_mixtures=n_mixtures)
 
         mixture_creator = mix_constructor.AudioMixtureConstructor(
-            n_fft=512, win_len=512, hop_len=256, mixture_duration=2.0,
+            n_fft=512, win_len=512, hop_len=128, mixture_duration=2.0,
             force_delays=force_delays)
 
         gt_estimator = mask_estimator.TFMaskEstimator(
@@ -324,10 +319,6 @@ class RandomCombinations(ArtificialDatasetCreator):
             duet_estimator = mask_estimator.TFMaskEstimator(
                              inference_method='duet_Kmeans')
 
-        import time
-        input("Before updating mixture info...")
-
-        before = time.time()
         mixtures_info = [self.update_label_masks_and_info(
                          mixture_info,
                          ground_truth_estimator=gt_estimator,
@@ -335,16 +326,27 @@ class RandomCombinations(ArtificialDatasetCreator):
                          soft_label_estimator=duet_estimator)
                          for mixture_info in mixtures_info]
 
-
-
-        now = time.time()
-        input("After updating mixture info...")
-        print(mixtures_info[0].keys())
-        print("For {} mixtures creation and inference took: {} "
-              "seconds".format(len(mixtures_info), now-before))
-        # input("Before creating the mixtures...")
-
         return mixtures_info
+
+    def get_all_mixture_sets(self,
+                             n_sources_in_mix=2,
+                             n_mixtures=0,
+                             force_delays=None,
+                             get_only_ground_truth=False):
+        speaker_sets = {self.subset_of_speakers: self.used_speakers}
+        if len(self.val_speakers):
+            speaker_sets['val'] = self.val_speakers
+
+        mixtures = {}
+        for speaker_set, speakers in speaker_sets.items():
+            mixtures[speaker_set] = self.get_mixture_combinations(
+                                    speakers,
+                                    n_sources_in_mix=n_sources_in_mix,
+                                    n_mixtures=n_mixtures,
+                                    force_delays=force_delays,
+                                    get_only_ground_truth=
+                                    get_only_ground_truth)
+        return mixtures
 
 
 def example_of_usage(args):
@@ -358,10 +360,12 @@ def example_of_usage(args):
                             subset_of_speakers=args.speakers_subset,
                             create_val_set=args.val_set)
 
-    mixture_combinations = timit_mixture_creator.get_mixture_combinations(
-                           n_sources_in_mix=args.n_sources,
-                           n_mixtures=args.n_samples,
-                           force_delays=args.force_delays)
+    mixtures = timit_mixture_creator.get_all_mixture_sets(
+               n_sources_in_mix=args.n_sources,
+               n_mixtures=args.n_samples,
+               force_delays=args.force_delays)
+
+    pprint(mixtures.keys())
 
 
 def get_args():
