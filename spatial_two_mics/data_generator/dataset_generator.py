@@ -21,10 +21,10 @@ sys.path.insert(0, root_dir)
 import spatial_two_mics.data_loaders.timit as timit_loader
 import spatial_two_mics.data_generator.source_position_generator as \
     positions_generator
-import spatial_two_mics.utils.audio_mixture_constructor as \
-    mixture_constructor
 import spatial_two_mics.labels_inference.tf_label_estimator as \
     mask_estimator
+import spatial_two_mics.utils.audio_mixture_constructor as \
+            mix_constructor
 
 
 class ArtificialDatasetCreator(object):
@@ -286,10 +286,24 @@ class RandomCombinations(ArtificialDatasetCreator):
 
         return mixtures_info
 
+    def update_label_masks_and_info(self,
+                                    mixture_info,
+                                    mixture_creator=None,
+                                    ground_truth_estimator=None,
+                                    soft_label_estimator=None):
+        tf_mixture = mixture_creator.construct_mixture(mixture_info)
+        gt_mask = ground_truth_estimator.infer_mixture_labels(tf_mixture)
+        del tf_mixture
+        mixture_info['ground_truth_mask'] = gt_mask
+        return mixture_info
+
     def get_mixture_combinations(self,
                                  n_sources_in_mix=2,
                                  n_mixtures=0,
-                                 force_delays=None):
+                                 force_delays=None,
+                                 get_only_ground_truth=False):
+
+        input("Before doing Anything...")
 
         mixtures_info = self.gather_mixtures_information(
                         self.used_speakers,
@@ -297,34 +311,33 @@ class RandomCombinations(ArtificialDatasetCreator):
                         n_mixtures=n_mixtures,
                         force_delays=force_delays)
 
-        import spatial_two_mics.utils.audio_mixture_constructor as \
-            mix_constructor
         mixture_creator = mix_constructor.AudioMixtureConstructor(
             n_fft=512, win_len=512, hop_len=256, mixture_duration=2.0,
             force_delays=force_delays)
 
-        import time
-        before = time.time()
-        tf_mixtures = [mixture_creator.construct_mixture(mi)
-                       for mi in mixtures_info]
-
         gt_estimator = mask_estimator.TFMaskEstimator(
                        inference_method='Ground_truth')
 
-        ground_truth_masks = [gt_estimator.infer_mixture_labels(tf_mix)
-                              for tf_mix in tf_mixtures]
-        input("Before deleting mixture info...")
+        import time
+        input("Before updating mixture info...")
 
-        del tf_mixtures
+        before = time.time()
+        mixtures_info = [self.update_label_masks_and_info(
+                         mixture_info,
+                         ground_truth_estimator=gt_estimator,
+                         mixture_creator=mixture_creator)
+                         for mixture_info in mixtures_info]
+
+
 
         now = time.time()
-        input("After deleting mixture info...")
-
+        input("After updating mixture info...")
+        print(mixtures_info[0].keys())
         print("For {} mixtures creation and inference took: {} "
               "seconds".format(len(mixtures_info), now-before))
         # input("Before creating the mixtures...")
 
-        return ground_truth_masks
+        return mixtures_info
 
 
 def example_of_usage(args):
