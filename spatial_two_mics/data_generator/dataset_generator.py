@@ -292,6 +292,9 @@ class RandomCombinations(ArtificialDatasetCreator):
         tf_mixture = mixture_creator.construct_mixture(mixture_info)
         gt_mask = ground_truth_estimator.infer_mixture_labels(tf_mixture)
         mixture_info['ground_truth_mask'] = gt_mask
+        if soft_label_estimator is not None:
+            duet_mask = soft_label_estimator.infer_mixture_labels(tf_mixture)
+            mixture_info['soft_labeled_mask'] = duet_mask
         return mixture_info
 
     def get_mixture_combinations(self,
