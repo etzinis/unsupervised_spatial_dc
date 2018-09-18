@@ -18,10 +18,9 @@ class AudioMixtureConstructor(object):
                  n_fft=1024,
                  win_len=None,
                  hop_len=None,
-                 force_all_signals_one_sample_delay=False,
+                 force_delays=None,
                  normalize_audio_by_std=True,
-                 mixture_duration=2.0,
-                 force_no_delay=False):
+                 mixture_duration=2.0):
         """
         :param fs: sampling rate
         :param n_fft: FFT window size
@@ -30,8 +29,9 @@ class AudioMixtureConstructor(object):
         If unspecified, defaults to win_length = n_fft.
         :param hop_len: number audio of frames between STFT columns.
         If unspecified, defaults win_length / 4.
-        :param force_all_signals_one_sample_delay: if true then forces a
-        -1 or 1 integer delay for the microphones mixtures
+        :param force_delays: list of delays to be forced in the
+        source signals -1 or 1 integer delay for the microphones
+        mixtures, if is [0, 0] then no delay would be forced
         :param normalize_audio_by_std: if the loaded wavs would be
         normalized by their std values
         :param mixture_duration: the duration on which the mixture
@@ -42,9 +42,7 @@ class AudioMixtureConstructor(object):
         self.win_len = win_len
         self.hop_len = hop_len
         self.normalize_audio_by_std = normalize_audio_by_std
-        self.force_all_signals_one_sample_delay =  \
-            force_all_signals_one_sample_delay
-        self.force_no_delay = force_no_delay
+        self.force_delays = force_delays
 
     @staticmethod
     def load_wav(source_info):
@@ -58,6 +56,14 @@ class AudioMixtureConstructor(object):
                     win_length=self.win_len,
                     hop_length=self.hop_len)
 
+    def force_delay_on_signal(self,
+                              signal,
+                              delay):
+        if delay >= 0:
+            return signal[delay:]
+        else:
+            return signal[:delay]
+
     def construct_delayed_signals(self,
                                   signals,
                                   taus):
@@ -68,33 +74,24 @@ class AudioMixtureConstructor(object):
         :return mic_signals ={ 'm1': [s1, s2, ..., sn], 'm2': same }
         """
 
-        if self.force_no_delay:
-            return {'m1': signals, 'm2':signals}
-
-        # naive way in order to force a delay for DUET algorithm
-        if self.force_all_signals_one_sample_delay:
-            delays = []
-            for tau in taus:
-                if tau >= 0:
-                    delays.append(1)
-                else:
-                    delays.append(-1)
-        else:
+        if self.force_delays is None:
             raise NotImplementedError("A real value delay should be "
                                       "implemented by utilizing "
                                       "interpolation. Currently "
                                       "Unavailable.")
 
-        delayed_signals = []
-        for i, delay in enumerate(delays):
-            new_signal = np.roll(signals[i], -delay)
-            if delay > 0:
-                new_signal[-delay:] = 0.
-            elif delay < 0:
-                new_signal[:-delay] = 0.
-            delayed_signals.append(new_signal)
+        else:
+        # naive way in order to force a delay for DUET algorithm
+            m1_delays = self.force_delays
+            m2_delays = self.force_delays[::-1]
+            mic_delays = {
+                'm1': [self.force_delay_on_signal(s, m1_delays[i])
+                       for (i, s) in enumerate(signals)],
+                'm2': [self.force_delay_on_signal(s, m2_delays[i])
+                       for (i, s) in enumerate(signals)]
+            }
 
-        return delayed_signals
+        return mic_delays
 
     def get_tf_representations(self,
                                mixture_info):
@@ -215,9 +212,17 @@ def example_of_usage():
                                               win_len=1024,
                                               hop_len=512,
                                               mixture_duration=2.0,
-                                              force_all_signals_one_sample_delay=True)
+                                              force_delays=[-1, 1])
 
     mixture_info = me.mixture_info_example()
+
+    import spatial_two_mics.data_generator.source_position_generator \
+        as  position_generator
+
+    # add some randomness in the generation of the positions
+    random_positioner = position_generator.RandomCirclePositioner()
+    positions_info = random_positioner.get_sources_locations(2)
+    mixture_info['positions'] = positions_info
 
     tf_mixtures = mixture_creator.construct_mixture(mixture_info)
 
