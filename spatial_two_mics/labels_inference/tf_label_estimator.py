@@ -76,7 +76,7 @@ def example_of_usage():
     mixture_info = me.mixture_info_example()
     mixture_creator = mix_constructor.AudioMixtureConstructor(
         n_fft=1024, win_len=400, hop_len=200, mixture_duration=2.0,
-        force_all_signals_one_sample_delay=True)
+        force_delays=[-1, 1])
 
     tf_mixtures = mixture_creator.construct_mixture(mixture_info)
 

@@ -23,6 +23,8 @@ import spatial_two_mics.data_generator.source_position_generator as \
     positions_generator
 import spatial_two_mics.utils.audio_mixture_constructor as \
     mixture_constructor
+import spatial_two_mics.labels_inference.tf_label_estimator as \
+    mask_estimator
 
 
 class ArtificialDatasetCreator(object):
@@ -233,7 +235,7 @@ class RandomCombinations(ArtificialDatasetCreator):
                                     speakers,
                                     n_sources_in_mix=2,
                                     n_mixtures=0,
-                                    force_all_signals_delay=False):
+                                    force_delays=None):
         """
         speakers_dic should be able to return a dic like this:
             'speaker_id_i': {
@@ -287,41 +289,42 @@ class RandomCombinations(ArtificialDatasetCreator):
     def get_mixture_combinations(self,
                                  n_sources_in_mix=2,
                                  n_mixtures=0,
-                                 force_all_signals_delay=False):
+                                 force_delays=None):
 
         mixtures_info = self.gather_mixtures_information(
                         self.used_speakers,
                         n_sources_in_mix=n_sources_in_mix,
                         n_mixtures=n_mixtures,
-                        force_all_signals_delay=False)
+                        force_delays=force_delays)
 
         import spatial_two_mics.utils.audio_mixture_constructor as \
             mix_constructor
         mixture_creator = mix_constructor.AudioMixtureConstructor(
             n_fft=512, win_len=512, hop_len=256, mixture_duration=2.0,
-            force_all_signals_one_sample_delay=True)
+            force_delays=force_delays)
 
         import time
         before = time.time()
         tf_mixtures = [mixture_creator.construct_mixture(mi)
                        for mi in mixtures_info]
-        now = time.time()
 
-        print("For {} mixtures creation it took: {} seconds".format(
-            len(mixtures_info), now-before
-        ))
+        gt_estimator = mask_estimator.TFMaskEstimator(
+                       inference_method='Ground_truth')
+
+        ground_truth_masks = [gt_estimator.infer_mixture_labels(tf_mix)
+                              for tf_mix in tf_mixtures]
+        input("Before deleting mixture info...")
+
+        del tf_mixtures
+
+        now = time.time()
+        input("After deleting mixture info...")
+
+        print("For {} mixtures creation and inference took: {} "
+              "seconds".format(len(mixtures_info), now-before))
         # input("Before creating the mixtures...")
 
-        # mixtures = [self.acquire_mixture_information(
-        #                  speakers_dic,
-        #                  combination,
-        #                  random_positioner.get_sources_locations(len(
-        #                                                  combination)),
-        #                  force_all_signals_delay=force_all_signals_delay)
-        #             for combination in valid_combinations]
-
-        # print(len(mixtures))
-        return None
+        return ground_truth_masks
 
 
 def example_of_usage(args):
@@ -338,7 +341,7 @@ def example_of_usage(args):
     mixture_combinations = timit_mixture_creator.get_mixture_combinations(
                            n_sources_in_mix=args.n_sources,
                            n_mixtures=args.n_samples,
-                           force_all_signals_delay=args.force_integer_delay)
+                           force_delays=args.force_delays)
 
 
 def get_args():
@@ -366,10 +369,10 @@ def get_args():
                         child folders train or test and val if it is 
                         selected""",
                         required=True)
-    parser.add_argument("-f", "--force_integer_delay",
-                        help="""Whether you want to force an integer 
-                        delay of +- 1 in the sources.""",
-                        action="store_true")
+    parser.add_argument("-f", "--force_delays", nargs='+', type=int,
+                        help="""Whether you want to force integer 
+                        delays of +- 1 in the sources e.g.""",
+                        default=None)
     parser.add_argument('--val_set', action="store_true",
                         help='Force to create a separate val folder '
                              'with the same amount of the mixtures as '
