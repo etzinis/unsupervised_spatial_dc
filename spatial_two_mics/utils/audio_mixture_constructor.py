@@ -145,7 +145,7 @@ class AudioMixtureConstructor(object):
             'm2_raw': m2,
             'm1_tf': m1_tf,
             'm2_tf': m2_tf,
-            'sources_raw': cropped_signals,
+            'sources_raw': mic_signals['m1'],
             'sources_tf': sources_spectra,
             'amplitudes': positions['amplitudes']
         }
