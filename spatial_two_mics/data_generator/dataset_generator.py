@@ -318,6 +318,12 @@ class RandomCombinations(ArtificialDatasetCreator):
         gt_estimator = mask_estimator.TFMaskEstimator(
                        inference_method='Ground_truth')
 
+        if get_only_ground_truth:
+            duet_estimator = None
+        else:
+            duet_estimator = mask_estimator.TFMaskEstimator(
+                             inference_method='duet_Kmeans')
+
         import time
         input("Before updating mixture info...")
 
@@ -325,7 +331,8 @@ class RandomCombinations(ArtificialDatasetCreator):
         mixtures_info = [self.update_label_masks_and_info(
                          mixture_info,
                          ground_truth_estimator=gt_estimator,
-                         mixture_creator=mixture_creator)
+                         mixture_creator=mixture_creator,
+                         soft_label_estimator=duet_estimator)
                          for mixture_info in mixtures_info]
 
 

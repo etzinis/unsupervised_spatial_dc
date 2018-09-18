@@ -21,11 +21,7 @@ def infer_mask(mixture_info):
         'sources_raw': a list of numpy 1d vectors containing the
         sources ,
         'sources_tf': a list of numpy 2d vectors containing the
-         TF represeantations of the sources ,
-        'delayed_sources_raw': a list of numpy 1d vectors containing
-        the sources delayed with some tau,
-        'delayed_sources_tf': a list of numpy 2d vectors
-        containing the TF representations of the delayed signals,
+         TF represeantations of the sources
         'amplitudes': the weights that each source contributes to
         the mixture of the second microphone
     }

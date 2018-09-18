@@ -85,10 +85,9 @@ def example_of_usage():
 
     tf_mixtures = mixture_creator.construct_mixture(mixture_info)
 
-    ground_truth_estimator = TFMaskEstimator(
-                             inference_method='duet_Kmeans')
+    duet_estimator = TFMaskEstimator(inference_method='duet_Kmeans')
 
-    tf_labels = ground_truth_estimator.infer_mixture_labels(tf_mixtures)
+    tf_labels = duet_estimator.infer_mixture_labels(tf_mixtures)
     print("DUET Kmeans")
     pprint(tf_labels.shape)
 
