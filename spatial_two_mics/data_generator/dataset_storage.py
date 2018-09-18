@@ -10,6 +10,7 @@ import argparse
 import os
 import sys
 from pprint import pprint
+from sklearn.externals import joblib
 
 root_dir = os.path.join(
     os.path.dirname(os.path.realpath(__file__)),
@@ -46,8 +47,28 @@ def get_mixture_name_and_data_to_save(mix_info):
 
     return name, data
 
+def time_loading_comparison(data, f_path):
+    import _pickle as cPickle
+    from sklearn.externals import joblib
+    import time
+
+    joblib.dump(data, f_path)
+    before = time.time()
+    tempos = joblib.load(f_path)
+    now = time.time()
+    jlib_time = now - before
+
+    cPickle.dump(data, open(f_path, 'wb'))
+    before = time.time()
+    tempos = cPickle.load(open(f_path, 'rb'))
+    now = time.time()
+    pickle_time = now - before
+
+    return jlib_time, pickle_time
+
 
 def store_dataset(dataset_dic, args):
+
     dataset_name = create_dataset_name(args)
 
     dataset_path = os.path.join(args.output_path, dataset_name)
@@ -55,17 +76,14 @@ def store_dataset(dataset_dic, args):
         os.makedirs(dataset_path)
 
     for subf, mixtures_info in dataset_dic.items():
-        new_path = os.path.join(dataset_path, subf)
-        if not os.path.exists(subf):
-            os.makedirs(subf)
+        subf_path = os.path.join(dataset_path, subf)
+        if not os.path.exists(subf_path):
+            os.makedirs(subf_path)
 
         for mix_info in mixtures_info:
             name, data = get_mixture_name_and_data_to_save(mix_info)
-            print(name)
-            pprint(data)
-            break
-    print(dataset_name)
-    print(new_path)
+            f_path = os.path.join(subf_path, name)
+            joblib.dump(data, f_path, compress=3)
 
 
 def generate_dataset(args):
@@ -99,7 +117,6 @@ def generate_dataset(args):
 def create_and_store_dataset(args):
     dataset_dic = generate_dataset(args)
     store_dataset(dataset_dic, args)
-
 
 
 def get_args():
