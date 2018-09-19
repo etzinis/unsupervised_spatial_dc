@@ -36,9 +36,8 @@ def get_mixture_name_and_data_to_save(mix_info):
     name = '_'.join(name)
 
     data = {
-        'amplitudes': mix_info['positions']['amplitudes'],
-        'wav_paths': [s_id['wav_path']
-                      for s_id in mix_info['sources_ids']],
+        'positions': mix_info['positions'],
+        'sources_ids': mix_info['sources_ids'],
         'ground_truth_mask': mix_info['ground_truth_mask']
     }
 
