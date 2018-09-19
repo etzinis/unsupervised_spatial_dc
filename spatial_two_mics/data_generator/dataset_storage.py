@@ -9,6 +9,7 @@ mixtures form the dataset and also store them inside a specified folder
 import argparse
 import os
 import sys
+import numpy as np
 from pprint import pprint
 from sklearn.externals import joblib
 
@@ -108,6 +109,15 @@ def generate_dataset(args):
         n_sources_in_mix=args.n_sources,
         n_mixtures=max(n_test, n_val),
         force_delays=args.force_delays)
+
+    if n_val > n_test:
+        test_val_dic['test'] = np.random.choice(test_val_dic['test'],
+                                                size=n_test,
+                                                replace=False)
+    elif n_val < n_test:
+        test_val_dic['val'] = np.random.choice(test_val_dic['val'],
+                                               size=n_val,
+                                               replace=False)
 
     dataset_dic.update(test_val_dic)
     return dataset_dic
