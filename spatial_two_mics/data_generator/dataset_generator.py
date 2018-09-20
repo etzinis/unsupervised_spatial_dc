@@ -25,6 +25,7 @@ import spatial_two_mics.labels_inference.tf_label_estimator as \
     mask_estimator
 import spatial_two_mics.utils.audio_mixture_constructor as \
             mix_constructor
+import spatial_two_mics.utils.progress_display as progress_display
 
 
 class ArtificialDatasetCreator(object):
@@ -297,6 +298,17 @@ class RandomCombinations(ArtificialDatasetCreator):
             mixture_info['soft_labeled_mask'] = duet_mask
         return mixture_info
 
+    def combination_process_wrapper(self,
+                                    ground_truth_estimator=None,
+                                    mixture_creator=None,
+                                    soft_label_estimator=None):
+        return lambda mix_info: \
+               self.update_label_masks_and_info(
+                    mix_info,
+                    ground_truth_estimator=ground_truth_estimator,
+                    mixture_creator=mixture_creator,
+                    soft_label_estimator=soft_label_estimator)
+
     def get_mixture_combinations(self,
                                  speakers,
                                  n_sources_in_mix=2,
@@ -308,6 +320,9 @@ class RandomCombinations(ArtificialDatasetCreator):
                         speakers,
                         n_sources_in_mix=n_sources_in_mix,
                         n_mixtures=n_mixtures)
+
+        print("Created the combinations of all the speakers and "
+              "ready to process each mixture separately!")
 
         mixture_creator = mix_constructor.AudioMixtureConstructor(
             n_fft=512, win_len=512, hop_len=128, mixture_duration=2.0,
@@ -322,12 +337,17 @@ class RandomCombinations(ArtificialDatasetCreator):
             duet_estimator = mask_estimator.TFMaskEstimator(
                              inference_method='duet_Kmeans')
 
-        mixtures_info = [self.update_label_masks_and_info(
-                         mixture_info,
-                         ground_truth_estimator=gt_estimator,
-                         mixture_creator=mixture_creator,
-                         soft_label_estimator=duet_estimator)
-                         for mixture_info in mixtures_info]
+        mix_info_func = self.combination_process_wrapper(
+                             ground_truth_estimator=gt_estimator,
+                             mixture_creator=mixture_creator,
+                             soft_label_estimator=duet_estimator)
+        n_mixes = str(len(mixtures_info))
+        mixtures_info = progress_display.progress_bar_wrapper(
+                                         mix_info_func,
+                                         mixtures_info,
+                                         message='Creating '
+                                                  +n_mixes+
+                                                  ' Mixtures...')
 
         return mixtures_info
 
