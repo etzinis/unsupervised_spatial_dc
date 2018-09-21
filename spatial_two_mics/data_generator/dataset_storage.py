@@ -23,11 +23,11 @@ import spatial_two_mics.data_generator.dataset_generator as generator
 
 def create_dataset_name(args):
     dataset_name = '{}_{}_{}_{}_{}'.format(
-                    args.dataset,
-                    '_'.join(map(str, args.n_samples)),
-                    args.n_sources,
-                    ''.join(sorted(args.genders)),
-                    'taus'.join(map(str,  args.force_delays)))
+                    args['dataset'],
+                    '_'.join(map(str, args['n_samples'])),
+                    args['n_sources'],
+                    ''.join(sorted(args['genders'])),
+                    'taus'.join(map(str,  args['force_delays'])))
     return dataset_name
 
 
@@ -69,7 +69,8 @@ def time_loading_comparison(data, f_path):
 
 def store_dataset(dataset_dic, args):
 
-    dataset_name = create_dataset_name(args)
+    dataset_params = args.__dict__
+    dataset_name = create_dataset_name(dataset_params)
 
     dataset_path = os.path.join(args.output_path, dataset_name)
     if not os.path.exists(dataset_path):
