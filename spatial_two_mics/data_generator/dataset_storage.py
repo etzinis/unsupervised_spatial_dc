@@ -36,6 +36,10 @@ def get_mixture_name_and_data_to_save(mix_info):
             for s_id in mix_info['sources_ids']]
     name = '_'.join(name)
 
+    # don't save also the wavs, read them real time 
+    for i, source_info in enumerate(mix_info['sources_ids']):
+        del mix_info['sources_ids'][i]['wav']
+
     data = {
         'positions': mix_info['positions'],
         'sources_ids': mix_info['sources_ids'],
