@@ -131,10 +131,10 @@ class PytorchMixtureDataset(Dataset):
 def concatenate_for_masks(masks, n_sources, batch_size):
     # create 3d masks for each source
     batch_list = []
-    for b in torch.arange():
+    for b in torch.arange(batch_size):
         sources_list = []
-        for i in torch.arange(args.n_sources):
-            source_mask = masks == int(i)
+        for i in torch.arange(n_sources):
+            source_mask = masks[b, :, :] == int(i)
             sources_list.append(source_mask)
 
         sources_tensor = torch.stack(sources_list,
@@ -143,12 +143,25 @@ def concatenate_for_masks(masks, n_sources, batch_size):
     return torch.stack(batch_list, dim=0)
 
 
+def initialize_and_copy_masks(masks, n_sources, batch_size, device):
+    new_masks = torch.empty((batch_size,
+                             masks.shape[1],
+                             masks.shape[2],
+                             n_sources),
+                            dtype=torch.uint8)
+    new_masks.to(device)
+    for i in torch.arange(n_sources):
+        new_masks[:, :, :, i] = masks[:, :, :] == int(i)
+
+    return new_masks
+
+
 def example_of_usage(args):
     import time
 
     training_data = PytorchMixtureDataset(**args.__dict__)
 
-    generator_params = {'batch_size': 64,
+    generator_params = {'batch_size': 128,
                         'shuffle': True,
                         'num_workers': 1,
                         'drop_last': True}
@@ -171,7 +184,7 @@ def example_of_usage(args):
         timing_dic['Loading from disk'] = now-before
 
         before = time.time()
-        input_tf, mask_tf = abs_tfs.to(device), duet_masks.to(device)
+        input_tf, masks_tf = abs_tfs.to(device), duet_masks.to(device)
         now = time.time()
         timing_dic['Loading to GPU'] = now - before
 
@@ -186,6 +199,25 @@ def example_of_usage(args):
         now = time.time()
         timing_dic['Stacking in appropriate dimensions the masks'] = \
             now - before
+
+        before = time.time()
+        duet_copy = initialize_and_copy_masks(duet_masks,
+                                              args.n_sources,
+                                              generator_params[
+                                                  'batch_size'],
+                                              device)
+
+        gt_copy = initialize_and_copy_masks(ground_truth_masks,
+                                            args.n_sources,
+                                            generator_params[
+                                              'batch_size'],
+                                            device)
+        now = time.time()
+        timing_dic['Initializing and copying for masks'] = now - before
+
+        assert torch.equal(duet_copy, duet_stack)
+        assert torch.equal(gt_copy, gt_stack)
+
 
         # torch.cuda.empty_cache()
         pprint(timing_dic)
