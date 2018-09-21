@@ -5,6 +5,7 @@
 @copyright University of illinois at Urbana Champaign
 """
 
+import torch
 import argparse
 import os
 import sys
@@ -127,23 +128,40 @@ class PytorchMixtureDataset(Dataset):
                 sources_raw, amplitudes, n_sources)
 
 
+def concatenate_for_masks(masks, n_sources, batch_size):
+    # create 3d masks for each source
+    batch_list = []
+    for b in torch.arange():
+        sources_list = []
+        for i in torch.arange(args.n_sources):
+            source_mask = masks == int(i)
+            sources_list.append(source_mask)
+
+        sources_tensor = torch.stack(sources_list,
+                                     dim=n_sources)
+        batch_list.append(sources_tensor)
+    return torch.stack(batch_list, dim=0)
+
+
 def example_of_usage(args):
-    import torch
     import time
 
     training_data = PytorchMixtureDataset(**args.__dict__)
 
     generator_params = {'batch_size': 64,
                         'shuffle': True,
-                        'num_workers': 6,
+                        'num_workers': 1,
                         'drop_last': True}
     training_generator = DataLoader(training_data, **generator_params)
     device = torch.device("cuda")
 
     timing_dic = {}
 
+    batch_now = time.time()
     # just iterate over the data
     for batch_data in training_generator:
+        timing_dic['Loading batch'] = time.time() - batch_now
+        batch_now = time.time()
 
         before = time.time()
         (abs_tfs, real_tfs, imag_tfs,
@@ -157,24 +175,14 @@ def example_of_usage(args):
         now = time.time()
         timing_dic['Loading to GPU'] = now - before
 
+
         before = time.time()
-        # create 3d masks for each source
-        batch_list = []
-        for b in torch.arange(generator_params['batch_size']):
-            sources_list = []
-            for i in torch.arange(args.n_sources):
-                source_mask = duet_masks == int(i)
-                sources_list.append(source_mask)
-
-            sources_tensor = torch.stack(sources_list,
-                                         dim=args.n_sources)
-            # print("Concatenated Source Vector is in shape: {}"
-            #       "".format(sources_tensor.shape))
-            batch_list.append(sources_tensor)
-        result_tensor = torch.stack(batch_list, dim=0)
-        # print("Concatenated Batch Tensor is in shape: {}"
-        #       "".format(result_tensor.shape))
-
+        duet_stack = concatenate_for_masks(duet_masks,
+                                           args.n_sources,
+                                           generator_params['batch_size'])
+        gt_stack = concatenate_for_masks(ground_truth_masks,
+                                         args.n_sources,
+                                         generator_params['batch_size'])
         now = time.time()
         timing_dic['Stacking in appropriate dimensions the masks'] = \
             now - before
