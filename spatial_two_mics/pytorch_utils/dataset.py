@@ -5,6 +5,7 @@
 @copyright University of illinois at Urbana Champaign
 """
 
+import argparse
 import os
 import sys
 import glob2
@@ -20,6 +21,9 @@ root_dir = os.path.join(
 sys.path.insert(0, root_dir)
 import spatial_two_mics.utils.audio_mixture_constructor as \
     mixture_creator
+import spatial_two_mics.config as config
+import spatial_two_mics.data_generator.dataset_storage as \
+    dataset_storage
 
 
 class PytorchMixtureDataset(Dataset):
@@ -29,20 +33,48 @@ class PytorchMixtureDataset(Dataset):
     @note Each instance of the dataset should be stored using
     joblib.dump() and this is the way that it would be returned.
     After some transformations.
+
+    The path of all datasets should be defined inside config.
+    All datasets should be formatted with appropriate subfolders of
+    train / test and val and under them there should be all the
+    available files.
     """
     def __init__(self,
-                 root_dir_path,
+                 dataset='timit',
+                 partition='train',
+                 n_samples=[512, 128, 256],
+                 n_sources=2,
+                 genders=['f', 'm'],
                  n_fft=512,
                  win_len=512,
                  hop_length=128,
                  mixture_duration=2.0,
                  force_delays=[-1, 1]):
 
-        if not os.path.isdir(root_dir_path):
+        self.dataset_params = {
+            'dataset': dataset,
+            'n_samples': n_samples,
+            'n_sources': n_sources,
+            'genders': genders,
+            'force_delays': force_delays
+        }
+        dataset_name = dataset_storage.create_dataset_name(
+                                       self.dataset_params)
+
+        self.dataset_dirpath = os.path.join(
+                               config.DATASETS_DIR,
+                               dataset_name,
+                               partition)
+
+        if not os.path.isdir(self.dataset_dirpath):
             raise IOError("Dataset folder {} not found!".format(
-                          root_dir_path))
-        self.root_path = root_dir_path
-        self.data_paths = glob2.glob(os.path.join(self.root_path, '*'))
+                          self.dataset_dirpath))
+        else:
+            print("Loading files from {} ...".format(
+                  self.dataset_dirpath))
+
+        self.data_paths = glob2.glob(os.path.join(self.dataset_dirpath,
+                                                  '*'))
         self.n_samples = len(self.data_paths)
 
         self.mix_creator = mixture_creator.AudioMixtureConstructor(
@@ -64,7 +96,12 @@ class PytorchMixtureDataset(Dataset):
                           "using joblib.".format(file_path))
 
         tf_info = self.mix_creator.construct_mixture(mixture_info)
-        mixture_tf = abs(tf_info['m1_tf'])
+        mixture_tf = tf_info['m1_tf']
+        abs_tf = abs(mixture_tf)
+        real_tf = np.real(mixture_tf)
+        imag_tf = np.imag(mixture_tf)
+
+        # assert (real_tf + 1j * imag_tf == mixture_tf).all()
 
         duet_mask = None
         ground_truth_mask = None
@@ -81,36 +118,76 @@ class PytorchMixtureDataset(Dataset):
                            "mask inferred by the most dominant source "
                            "in each TF bin.")
 
-        return mixture_tf, duet_mask, ground_truth_mask
+        sources_raw = np.array(tf_info['sources_raw'])
+        amplitudes = np.array(mixture_info['positions']['amplitudes'])
+        n_sources = len(sources_raw)
+
+        return (abs_tf, real_tf, imag_tf,
+                duet_mask, ground_truth_mask,
+                sources_raw, amplitudes, n_sources)
 
 
-def example_of_usage(dataset_path):
-    training_data = PytorchMixtureDataset(dataset_path)
+def example_of_usage(args):
+    import torch
+    training_data = PytorchMixtureDataset(**args.__dict__)
 
-    generator_params = {'batch_size': 10,
+    generator_params = {'batch_size': 2,
                         'shuffle': True,
-                        'num_workers': 2}
+                        'num_workers': 2,
+                        'drop_last': True}
     training_generator = DataLoader(training_data, **generator_params)
+    device = torch.device("cuda")
+
 
     # just iterate over the data
     for batch_data in training_generator:
-        mixtures_tf, duet_masks, gt_masks = batch_data
-        print(type(mixtures_tf))
-        print(mixtures_tf.shape)
-        print(duet_masks.shape)
-        print(gt_masks.shape)
-        break
+        (abs_tfs, real_tfs, imag_tfs,
+         duet_masks, ground_truth_masks,
+         sources_raw, amplitudes, n_sources) = batch_data
 
+        input_tf, mask_tf = abs_tfs.to(device), duet_masks.to(device)
+
+        # create 3d masks for each source
+        for b in torch.arange(generator_params['batch_size']):
+            for i in torch.arange(2):
+                print("Initial Duet mask")
+                print(duet_masks[b, :4, :4])
+                source_mask = duet_masks[b, :4, :4] == int(i)
+                print("Infered source mask")
+                print(source_mask)
+
+
+
+        input("Checkare mem")
+        torch.cuda.empty_cache()
+        input("Checkare mem")
+
+
+def get_args():
+    """! Command line parser """
+    parser = argparse.ArgumentParser(description='Pytorch Dataset '
+                                                 'Loader')
+    parser.add_argument("--dataset", type=str,
+                        help="Dataset name", default="timit")
+    parser.add_argument("--n_sources", type=int,
+                        help="How many sources in each mix", default=2)
+    parser.add_argument("--n_samples", type=int, nargs='+',
+                        help="How many samples do u want to be "
+                             "created for train test val",
+                        required=True)
+    parser.add_argument("--genders", type=str, nargs='+',
+                        help="Genders that will correspond to the "
+                             "genders in the mixtures",
+                        default=['m', 'f'])
+    parser.add_argument("-f", "--force_delays", nargs='+', type=int,
+                        help="""Whether you want to force integer 
+                        delays of +- 1 in the sources e.g.""",
+                        default=[-1,1])
+    return parser.parse_args()
 
 
 if __name__ == "__main__":
-    root_dir = '/home/thymios/data'
-    data_parametered_name = 'timit_27000_9000_18000_2_m_-1taus1'
-    data_parametered_name = 'timit_256_64_128_2_m_-1taus1'
-    partition = 'train'
-    dataset_path = os.path.join(root_dir,
-                                data_parametered_name,
-                                partition)
-    example_of_usage(dataset_path)
+    args = get_args()
+    example_of_usage(args)
 
 
