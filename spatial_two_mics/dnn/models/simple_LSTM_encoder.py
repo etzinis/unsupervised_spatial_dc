@@ -11,20 +11,22 @@ import torch.nn as nn
 
 class BLSTMEncoder(nn.Module):
     def __init__(self,
-                 n_timesteps=None,
-                 n_features=None,
+                 n_timesteps=250,
+                 n_features=257,
                  num_layers=1,
                  hidden_size=None,
                  embedding_depth=None,
                  bidirectional=True):
+        super(BLSTMEncoder, self).__init__()
 
         if n_timesteps is None or n_features is None:
             raise ValueError("You have to define both the number of "
                              "timesteps in each sequence and the "
                              "number of features for each timestep.")
         else:
-            self.emb_dim = n_timesteps * n_features * embedding_depth
+            self.emb_dim = n_features * embedding_depth
 
+        self.embedding_depth = embedding_depth
         self.hidden_size = hidden_size
         self.n_timesteps = n_timesteps
         if bidirectional:
@@ -33,7 +35,7 @@ class BLSTMEncoder(nn.Module):
             self.n_directions = 1
         # assert len(self.hidden_sizes) == num_layers, 'Each layer ' \
         #        'should be defined by a corresponding hidden size.'
-        self.rnn = nn.LSTM(input_size=self.n_timesteps,
+        self.rnn = nn.LSTM(input_size=n_features,
                            num_layers=num_layers,
                            hidden_size=self.hidden_size,
                            bidirectional=bidirectional,
@@ -42,9 +44,12 @@ class BLSTMEncoder(nn.Module):
                                 self.emb_dim)
 
     def forward(self, x):
-        print(x.size)
-        output, (hidden, states) = self.rnn(x)
-        print(output.size)
+        rnn_out, (hidden, states) = self.rnn(x)
+        nonl_embedding = torch.sigmoid(self.affine(rnn_out))
+        v = nonl_embedding.contiguous().view(x.size(0),
+                                             -1,
+                                             self.embedding_depth)
+        return v
 
 
 if __name__ == "__main__":
