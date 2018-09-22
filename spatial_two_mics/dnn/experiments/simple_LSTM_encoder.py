@@ -23,6 +23,7 @@ import spatial_two_mics.dnn.models.simple_LSTM_encoder as LSTM_enc
 import spatial_two_mics.dnn.losses.affinity_approximation as \
     affinity_losses
 import spatial_two_mics.dnn.utils.dataset as data_generator
+import spatial_two_mics.dnn.utils.data_conversions as converters
 
 
 def check_device_model_loading(model):
@@ -49,24 +50,11 @@ def compare_losses(vs, ys):
     before = time.time()
     naive_loss = affinity_losses.naive(vs, ys)
     now = time.time()
-    timing_dic['Naive Loss Implementation'] = before - now
+    timing_dic['Naive Loss Implementation'] = now - before
 
     pprint(timing_dic)
 
     return naive_loss
-
-
-def initialize_and_copy_masks(masks, n_sources, batch_size):
-    new_masks = torch.cuda.empty((batch_size,
-                                  masks.shape[1],
-                                  masks.shape[2],
-                                  n_sources),
-                                  dtype=torch.cuda.FloatTensor)
-    new_masks.cuda()
-    for i in torch.arange(n_sources):
-        new_masks[:, :, :, int(i)] = masks[:, :, :] == int(i)
-
-    return new_masks
 
 
 def example_of_usage(args):
@@ -100,40 +88,22 @@ def example_of_usage(args):
          sources_raw, amplitudes, n_sources) = batch_data
 
         input_tfs, index_ys = abs_tfs.to(device), duet_masks.cuda()
-
-        print(index_ys.shape)
-        print(index_ys[0, :5, :5])
-
-        clustered_ys = index_ys.unsqueeze(-1).long()
-
-        print(clustered_ys.shape)
-        print(clustered_ys[0, :5, :5, 0])
-        print(clustered_ys.dtype)
-        one_hot = torch.cuda.FloatTensor(clustered_ys.size(0),
-                                         clustered_ys.size(1),
-                                         clustered_ys.size(2),
-                                         n_sources[0]).zero_()
-        target = one_hot.scatter_(3, clustered_ys, 1)
-
-        print(target[0, :5, 2, :])
-        input()
-
-        # ys = initialize_and_copy_masks(clustered_ys,
-        #                                n_sources,
-        #                                clustered_ys.size(0))
-
         # the input sequence is determined by time and not freqs
-        input_tfs = input_tfs.permute(0, 2, 1)
-        ys = ys.permute(0, 2, 1)
+        # before: input_tfs = batch_size x (n_fft/2+1) x n_timesteps
+        input_tfs = input_tfs.permute(0, 2, 1).contiguous()
+        index_ys = index_ys.permute(0, 2, 1).contiguous()
 
-        print(ys.shape)
-        input()
+        one_hot_ys = converters.one_hot_3Dmasks(index_ys, n_sources[0])
 
+        flatened_ys = one_hot_ys.view(one_hot_ys.size(0),
+                                      -1,
+                                      one_hot_ys.size(-1)).cuda()
 
         optimizer.zero_grad()
         vs = model(input_tfs)
 
-        loss = compare_losses(vs, ys)
+        loss = compare_losses(vs, flatened_ys)
+        print(loss)
 
 
 def get_args():
