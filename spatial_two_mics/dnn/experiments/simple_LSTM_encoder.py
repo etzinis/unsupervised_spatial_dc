@@ -44,17 +44,28 @@ def check_device_model_loading(model):
     print(torch.cuda.memory_cached(device))
 
 
-def compare_losses(vs, ys):
+def compare_losses(vs, one_hot_ys):
     timing_dic = {}
 
     before = time.time()
-    naive_loss = affinity_losses.naive(vs, ys)
+    flatened_ys = one_hot_ys.view(one_hot_ys.size(0),
+                                  -1,
+                                  one_hot_ys.size(-1)).cuda()
+    naive_loss = affinity_losses.naive(vs, flatened_ys)
     now = time.time()
     timing_dic['Naive Loss Implementation'] = now - before
 
+    before = time.time()
+    expanded_vs = vs.view(vs.size(0), one_hot_ys.size(1),
+                          one_hot_ys.size(2), vs.size(-1)).cuda()
+    diagonal_loss = affinity_losses.diagonal(expanded_vs,
+                                             one_hot_ys)
+    now = time.time()
+    timing_dic['Diagonal Loss Implementation'] = now - before
+
     pprint(timing_dic)
 
-    return naive_loss
+    return diagonal_loss
 
 
 def example_of_usage(args):
@@ -95,15 +106,38 @@ def example_of_usage(args):
 
         one_hot_ys = converters.one_hot_3Dmasks(index_ys, n_sources[0])
 
-        flatened_ys = one_hot_ys.view(one_hot_ys.size(0),
-                                      -1,
-                                      one_hot_ys.size(-1)).cuda()
+        timing_dic = {}
 
         optimizer.zero_grad()
         vs = model(input_tfs)
 
-        loss = compare_losses(vs, flatened_ys)
-        print(loss)
+        before = time.time()
+        flatened_ys = one_hot_ys.view(one_hot_ys.size(0),
+                                      -1,
+                                      one_hot_ys.size(-1)).cuda()
+        naive_loss = affinity_losses.naive(vs, flatened_ys)
+        naive_loss.backward()
+        optimizer.step()
+        now = time.time()
+        print("Naive Loss: {}".format(naive_loss))
+        timing_dic['Naive Loss Implementation Time'] = now - before
+
+        optimizer.zero_grad()
+        vs = model(input_tfs)
+
+        before = time.time()
+        expanded_vs = vs.view(vs.size(0), one_hot_ys.size(1),
+                              one_hot_ys.size(2), vs.size(-1)).cuda()
+        diagonal_loss = affinity_losses.diagonal(expanded_vs,
+                                                 one_hot_ys)
+        diagonal_loss.backward()
+        optimizer.step()
+        now = time.time()
+        print("Diagonal Loss: {}".format(diagonal_loss))
+        timing_dic['Diagonal Loss Implementation Time'] = now - before
+
+        pprint(timing_dic)
+
 
 
 def get_args():
