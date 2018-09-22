@@ -20,11 +20,12 @@ root_dir = os.path.join(
 sys.path.insert(0, root_dir)
 
 import spatial_two_mics.dnn.models.simple_LSTM_encoder as LSTM_enc
-import spatial_two_mics.dnn.losses as losses
+import spatial_two_mics.dnn.losses.affinity_approximation as \
+    affinity_losses
 import spatial_two_mics.pytorch_utils.dataset as data_generator
 
 
-def check_device_model_laoding(model):
+def check_device_model_loading(model):
     device = 0
     print(torch.cuda.get_device_capability(device=device))
     print(torch.cuda.memory_allocated(device=device))
@@ -40,6 +41,32 @@ def check_device_model_laoding(model):
     print(torch.cuda.max_memory_cached(device=device))
     print(torch.cuda.memory_allocated(device))
     print(torch.cuda.memory_cached(device))
+
+
+def compare_losses(vs, ys):
+    timing_dic = {}
+
+    before = time.time()
+    naive_loss = affinity_losses.naive(vs, ys)
+    now = time.time()
+    timing_dic['Naive Loss Implementation'] = before - now
+
+    pprint(timing_dic)
+
+    return naive_loss
+
+
+def initialize_and_copy_masks(masks, n_sources, batch_size):
+    new_masks = torch.cuda.empty((batch_size,
+                                  masks.shape[1],
+                                  masks.shape[2],
+                                  n_sources),
+                                  dtype=torch.cuda.FloatTensor)
+    new_masks.cuda()
+    for i in torch.arange(n_sources):
+        new_masks[:, :, :, int(i)] = masks[:, :, :] == int(i)
+
+    return new_masks
 
 
 def example_of_usage(args):
@@ -65,24 +92,48 @@ def example_of_usage(args):
                                  lr=args.learning_rate,
                                  betas=(0.9, 0.999))
 
-    batch_now = time.time()
     # just iterate over the data
     for batch_data in training_generator:
-        timing_dic['Loading batch'] = time.time() - batch_now
-        batch_now = time.time()
 
-        before = time.time()
         (abs_tfs, real_tfs, imag_tfs,
          duet_masks, ground_truth_masks,
          sources_raw, amplitudes, n_sources) = batch_data
 
-        input_tfs, masks_tfs = abs_tfs.to(device), duet_masks.cuda()
+        input_tfs, index_ys = abs_tfs.to(device), duet_masks.cuda()
+
+        print(index_ys.shape)
+        print(index_ys[0, :5, :5])
+
+        clustered_ys = index_ys.unsqueeze(-1).long()
+
+        print(clustered_ys.shape)
+        print(clustered_ys[0, :5, :5, 0])
+        print(clustered_ys.dtype)
+        one_hot = torch.cuda.FloatTensor(clustered_ys.size(0),
+                                         clustered_ys.size(1),
+                                         clustered_ys.size(2),
+                                         n_sources[0]).zero_()
+        target = one_hot.scatter_(3, clustered_ys, 1)
+
+        print(target[0, :5, 2, :])
+        input()
+
+        # ys = initialize_and_copy_masks(clustered_ys,
+        #                                n_sources,
+        #                                clustered_ys.size(0))
 
         # the input sequence is determined by time and not freqs
         input_tfs = input_tfs.permute(0, 2, 1)
+        ys = ys.permute(0, 2, 1)
+
+        print(ys.shape)
+        input()
+
 
         optimizer.zero_grad()
         vs = model(input_tfs)
+
+        loss = compare_losses(vs, ys)
 
 
 def get_args():
