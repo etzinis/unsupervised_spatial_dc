@@ -47,7 +47,7 @@ def example_of_usage(args):
     cuda_id = "cuda:"+str(args.cuda_device)
     cuda_id = "cuda:0,1"
 
-    # training_generator = data_generator.get_data_generator(args)
+    training_generator = data_generator.get_data_generator(args)
     device = torch.device(cuda_id)
     timing_dic = {}
 
@@ -61,6 +61,9 @@ def example_of_usage(args):
     model = model.cuda()
     timing_dic['Transfering model to device'] = time.time() - before
 
+    optimizer = torch.optim.Adam(model.parameters(),
+                                 lr=args.learning_rate,
+                                 betas=(0.9, 0.999))
 
     batch_now = time.time()
     # just iterate over the data
@@ -73,18 +76,14 @@ def example_of_usage(args):
          duet_masks, ground_truth_masks,
          sources_raw, amplitudes, n_sources) = batch_data
 
-        print(abs_tfs.shape)
+        input_tfs, masks_tfs = abs_tfs.to(device), duet_masks.cuda()
 
-        now = time.time()
-        timing_dic['Loading from disk'] = now-before
+        # the input sequence is determined by time and not freqs
+        input_tfs = input_tfs.permute(0, 2, 1)
 
-        before = time.time()
-        input_tf, masks_tf = abs_tfs.to(device), duet_masks.cuda()
-        now = time.time()
-        timing_dic['Loading to GPU'] = now - before
+        optimizer.zero_grad()
+        vs = model(input_tfs)
 
-
-        pprint(timing_dic)
 
 def get_args():
     """! Command line parser """
@@ -126,6 +125,8 @@ def get_args():
     parser.add_argument("--num_workers", type=int,
                         help="""The number of cpu workers for 
                         loading the data, etc.""", default=3)
+    parser.add_argument("-lr", "--learning_rate", type=float,
+                        help="""Initial Learning rate""", default=1e-3)
     parser.add_argument("--bidirectional", action='store_true',
                         help="""Bidirectional or not""")
 
