@@ -18,7 +18,7 @@ from pprint import pprint
 
 root_dir = os.path.join(
            os.path.dirname(os.path.realpath(__file__)),
-           '../../')
+           '../../../')
 sys.path.insert(0, root_dir)
 import spatial_two_mics.utils.audio_mixture_constructor as \
     mixture_creator

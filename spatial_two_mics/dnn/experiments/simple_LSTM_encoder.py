@@ -22,7 +22,7 @@ sys.path.insert(0, root_dir)
 import spatial_two_mics.dnn.models.simple_LSTM_encoder as LSTM_enc
 import spatial_two_mics.dnn.losses.affinity_approximation as \
     affinity_losses
-import spatial_two_mics.pytorch_utils.dataset as data_generator
+import spatial_two_mics.dnn.utils.dataset as data_generator
 
 
 def check_device_model_loading(model):
