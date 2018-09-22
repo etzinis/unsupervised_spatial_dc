@@ -38,7 +38,10 @@ def get_mixture_name_and_data_to_save(mix_info):
 
     # don't save also the wavs, read them real time 
     for i, source_info in enumerate(mix_info['sources_ids']):
-        del mix_info['sources_ids'][i]['wav']
+        try:
+            del mix_info['sources_ids'][i]['wav']
+        except:
+            pass
 
     data = {
         'positions': mix_info['positions'],
