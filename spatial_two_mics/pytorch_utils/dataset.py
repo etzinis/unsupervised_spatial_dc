@@ -50,7 +50,8 @@ class PytorchMixtureDataset(Dataset):
                  win_len=512,
                  hop_length=128,
                  mixture_duration=2.0,
-                 force_delays=[-1, 1]):
+                 force_delays=[-1, 1],
+                 **kwargs):
 
         self.dataset_params = {
             'dataset': dataset,
@@ -126,6 +127,16 @@ class PytorchMixtureDataset(Dataset):
         return (abs_tf, real_tf, imag_tf,
                 duet_mask, ground_truth_mask,
                 sources_raw, amplitudes, n_sources)
+
+
+def get_data_generator(args):
+    data = PytorchMixtureDataset(**args.__dict__)
+    generator_params = {'batch_size': args.batch_size,
+                        'shuffle': True,
+                        'num_workers': args.num_workers,
+                        'drop_last': True}
+    data_generator = DataLoader(data, **generator_params)
+    return data_generator
 
 
 def concatenate_for_masks(masks, n_sources, batch_size):
