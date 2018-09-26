@@ -10,6 +10,7 @@ import os
 import sys
 import torch
 import time
+import numpy as np
 import copy
 from pprint import pprint
 from torch.utils.data import DataLoader
@@ -70,11 +71,12 @@ def compare_losses(vs, one_hot_ys):
 
 def example_of_usage(args):
 
-    cuda_id = "cuda:"+str(args.cuda_device)
-    cuda_id = "cuda:0,1"
+    visible_cuda_ids = ','.join(map(str, args.cuda_available_devices))
+    os.environ["CUDA_VISIBLE_DEVICES"] = visible_cuda_ids
+    print(visible_cuda_ids)
+    print(torch.cuda.current_device())
 
     training_generator = data_generator.get_data_generator(args)
-    device = torch.device(cuda_id)
     timing_dic = {}
 
     before = time.time()
@@ -83,7 +85,6 @@ def example_of_usage(args):
                                   embedding_depth=args.embedding_depth,
                                   bidirectional=args.bidirectional)
     timing_dic['Iitializing model'] = time.time() - before
-    os.environ["CUDA_VISIBLE_DEVICES"] = "1,2,3"
     model = model.cuda()
     timing_dic['Transfering model to device'] = time.time() - before
 
@@ -92,58 +93,63 @@ def example_of_usage(args):
                                  betas=(0.9, 0.999))
 
     # just iterate over the data
-    for batch_data in training_generator:
+    epochs = 10
+    for epoch in np.arange(epochs):
+        print("Training for epoch: {}...".format(epoch))
+        for batch_data in training_generator:
 
-        (abs_tfs, real_tfs, imag_tfs,
-         duet_masks, ground_truth_masks,
-         sources_raw, amplitudes, n_sources) = batch_data
+            (abs_tfs, real_tfs, imag_tfs,
+             duet_masks, ground_truth_masks,
+             sources_raw, amplitudes, n_sources) = batch_data
 
-        input_tfs, index_ys = abs_tfs.to(device), duet_masks.cuda()
-        # the input sequence is determined by time and not freqs
-        # before: input_tfs = batch_size x (n_fft/2+1) x n_timesteps
-        input_tfs = input_tfs.permute(0, 2, 1).contiguous()
-        index_ys = index_ys.permute(0, 2, 1).contiguous()
+            input_tfs, index_ys = abs_tfs.cuda(), duet_masks.cuda()
+            # the input sequence is determined by time and not freqs
+            # before: input_tfs = batch_size x (n_fft/2+1) x n_timesteps
+            input_tfs = input_tfs.permute(0, 2, 1).contiguous()
+            index_ys = index_ys.permute(0, 2, 1).contiguous()
 
-        one_hot_ys = converters.one_hot_3Dmasks(index_ys, n_sources[0])
+            one_hot_ys = converters.one_hot_3Dmasks(index_ys, n_sources[0])
 
-        timing_dic = {}
+            timing_dic = {}
 
-        optimizer.zero_grad()
-        vs = model(input_tfs)
+            optimizer.zero_grad()
+            vs = model(input_tfs)
 
-        before = time.time()
-        flatened_ys = one_hot_ys.view(one_hot_ys.size(0),
-                                      -1,
-                                      one_hot_ys.size(-1)).cuda()
-        naive_loss = affinity_losses.naive(vs, flatened_ys)
-        naive_loss.backward()
-        optimizer.step()
-        now = time.time()
-        print("Naive Loss: {}".format(naive_loss))
-        timing_dic['Naive Loss Implementation Time'] = now - before
+            before = time.time()
+            flatened_ys = one_hot_ys.view(one_hot_ys.size(0),
+                                          -1,
+                                          one_hot_ys.size(-1)).cuda()
+            naive_loss = affinity_losses.naive(vs, flatened_ys)
+            naive_loss.backward()
+            optimizer.step()
+            now = time.time()
+            print("Naive Loss: {}".format(naive_loss))
+            timing_dic['Naive Loss Implementation Time'] = now - before
 
-        optimizer.zero_grad()
-        vs = model(input_tfs)
+            optimizer.zero_grad()
+            vs = model(input_tfs)
 
-        before = time.time()
-        expanded_vs = vs.view(vs.size(0), one_hot_ys.size(1),
-                              one_hot_ys.size(2), vs.size(-1)).cuda()
-        diagonal_loss = affinity_losses.diagonal(expanded_vs,
-                                                 one_hot_ys)
-        diagonal_loss.backward()
-        optimizer.step()
-        now = time.time()
-        print("Diagonal Loss: {}".format(diagonal_loss))
-        timing_dic['Diagonal Loss Implementation Time'] = now - before
+            before = time.time()
+            expanded_vs = vs.view(vs.size(0), one_hot_ys.size(1),
+                                  one_hot_ys.size(2), vs.size(-1)).cuda()
+            diagonal_loss = affinity_losses.diagonal(expanded_vs,
+                                                     one_hot_ys)
+            diagonal_loss.backward()
+            optimizer.step()
+            now = time.time()
+            print("Diagonal Loss: {}".format(diagonal_loss))
+            timing_dic['Diagonal Loss Implementation Time'] = now - before
 
-        pprint(timing_dic)
+            pprint(timing_dic)
 
 
 
 def get_args():
     """! Command line parser """
-    parser = argparse.ArgumentParser(description='Pytorch Dataset '
-                                                 'Loader')
+    parser = argparse.ArgumentParser(description='Deep Clustering for '
+                                                 'Audio Source '
+                                                 'Separation '
+                                                 'Experiment')
     parser.add_argument("--dataset", type=str,
                         help="Dataset name",
                         default="timit")
@@ -174,9 +180,15 @@ def get_args():
     parser.add_argument("-bs", "--batch_size", type=int,
                         help="""The number of samples in each batch""",
                         default=64)
-    parser.add_argument("-cd", "--cuda_device", type=int,
-                        help="""The Cuda device ID""",
-                        default=0)
+    parser.add_argument("-name", "--experiment_name", type=str,
+                        help="""The name or identifier of this 
+                        experiment""",
+                        default='A sample experiment')
+    parser.add_argument("-cad", "--cuda_available_devices", type=int,
+                        nargs="+",
+                        help="""A list of Cuda IDs that would be 
+                        available for runnign this experiment""",
+                        default=[0])
     parser.add_argument("--num_workers", type=int,
                         help="""The number of cpu workers for 
                         loading the data, etc.""", default=3)
