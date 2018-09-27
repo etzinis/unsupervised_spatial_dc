@@ -63,6 +63,10 @@ class PytorchMixtureDataset(Dataset):
         dataset_name = dataset_storage.create_dataset_name(
                                        self.dataset_params)
 
+        self.dataset_stats_path = os.path.join(config.DATASETS_DIR,
+                                               dataset_name,
+                                               partition+'_stats')
+
         self.dataset_dirpath = os.path.join(
                                config.DATASETS_DIR,
                                dataset_name,
@@ -128,6 +132,36 @@ class PytorchMixtureDataset(Dataset):
                 duet_mask, ground_truth_mask,
                 sources_raw, amplitudes, n_sources)
 
+    def extract_stats(self):
+        if not os.path.lexists(self.dataset_stats_path):
+            mean = 0.
+            std = 0.
+            for file_path in self.data_paths:
+                try:
+                    mix_info = joblib.load(file_path)
+                except:
+                    raise IOError("Failed to load data from path: {} "
+                                  "using joblib.".format(file_path))
+
+                tf_info = self.mix_creator.construct_mixture(mix_info)
+                mixture_tf = tf_info['m1_tf']
+                abs_tf = abs(mixture_tf)
+                mean += np.mean(np.mean(abs_tf))
+                std += np.std(abs_tf)
+            mean /= self.__len__()
+            std /= self.__len__()
+
+        #     store them for later usage
+            joblib.dump((mean, std), self.dataset_stats_path)
+            print("Saving dataset mean and variance in: {}".format(
+                  self.dataset_stats_path))
+            return mean, std
+
+        else:
+            mean, std = joblib.load(self.dataset_stats_path)
+
+        return mean, std
+
 
 def get_data_generator(args):
     data = PytorchMixtureDataset(**args.__dict__)
@@ -171,6 +205,7 @@ def example_of_usage(args):
     import time
 
     training_data = PytorchMixtureDataset(**args.__dict__)
+    mean, std = training_data.extract_stats()
 
     generator_params = {'batch_size': 128,
                         'shuffle': True,
