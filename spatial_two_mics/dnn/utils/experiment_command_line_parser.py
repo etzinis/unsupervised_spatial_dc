@@ -55,6 +55,9 @@ def get_args():
     parser.add_argument("--num_workers", type=int,
                         help="""The number of cpu workers for 
                         loading the data, etc.""", default=3)
+    parser.add_argument("--epochs", type=int,
+                        help="""The number of epochs that the 
+                        experiment should run""", default=50)
     parser.add_argument("-lr", "--learning_rate", type=float,
                         help="""Initial Learning rate""", default=1e-3)
     parser.add_argument("--bidirectional", action='store_true',

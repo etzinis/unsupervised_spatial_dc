@@ -193,7 +193,7 @@ def get_args():
                         help="""The number of cpu workers for 
                         loading the data, etc.""", default=3)
     parser.add_argument("-lr", "--learning_rate", type=float,
-                        help="""Initial Learning rate""", default=1e-3)
+                        help="""Initial Learning rate""", default=1e-1)
     parser.add_argument("--bidirectional", action='store_true',
                         help="""Bidirectional or not""")
 

@@ -74,7 +74,7 @@ def convergence_of_LSTM(args):
             naive_loss = affinity_losses.naive(vs, flatened_ys)
             naive_loss.backward()
             optimizer.step()
-            print("Naive Loss: {}".format(naive_loss))
+            # print("Naive Loss: {}".format(naive_loss))
 
             update_history.values_update([('loss', naive_loss)],
                                          history,
