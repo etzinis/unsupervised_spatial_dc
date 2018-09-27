@@ -33,20 +33,20 @@ def convergence_of_LSTM(args):
     visible_cuda_ids = ','.join(map(str, args.cuda_available_devices))
     os.environ["CUDA_VISIBLE_DEVICES"] = visible_cuda_ids
 
-    training_generator = data_generator.get_data_generator(args)
+    (training_generator,
+     mean_tr, std_tr) = data_generator.get_data_generator(
+                        args, return_stats=True)
 
-    before = time.time()
     model = LSTM_enc.BLSTMEncoder(num_layers=args.n_layers,
                                   hidden_size=args.hidden_size,
                                   embedding_depth=args.embedding_depth,
                                   bidirectional=args.bidirectional)
-    model = model.cuda()
+    model = nn.DataParallel(model).cuda()
 
     optimizer = torch.optim.Adam(model.parameters(),
                                  lr=args.learning_rate,
                                  betas=(0.9, 0.999))
 
-    batch_size = args.batch_size
     # just iterate over the data
     history = {}
     for epoch in np.arange(args.epochs):
@@ -60,6 +60,11 @@ def convergence_of_LSTM(args):
             # the input sequence is determined by time and not freqs
             # before: input_tfs = batch_size x (n_fft/2+1) x n_timesteps
             input_tfs = input_tfs.permute(0, 2, 1).contiguous()
+
+            # normalize with mean and variance from the training dataset
+            input_tfs -= mean_tr
+            input_tfs /= std_tr
+
             index_ys = index_ys.permute(0, 2, 1).contiguous()
 
             one_hot_ys = converters.one_hot_3Dmasks(index_ys,
@@ -84,7 +89,7 @@ def convergence_of_LSTM(args):
                                      history,
                                      update_mode='epoch')
 
-        pprint(history)
+        pprint(history['loss'][-1])
 
 if __name__ == "__main__":
     args = parser.get_args()

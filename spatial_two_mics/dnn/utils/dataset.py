@@ -163,14 +163,19 @@ class PytorchMixtureDataset(Dataset):
         return mean, std
 
 
-def get_data_generator(args):
+def get_data_generator(args,
+                       return_stats=False):
     data = PytorchMixtureDataset(**args.__dict__)
     generator_params = {'batch_size': args.batch_size,
                         'shuffle': True,
                         'num_workers': args.num_workers,
                         'drop_last': True}
     data_generator = DataLoader(data, **generator_params)
-    return data_generator
+    if return_stats:
+        mean, std = data.extract_stats()
+        return data_generator, mean, std
+    else:
+        return data_generator
 
 
 def concatenate_for_masks(masks, n_sources, batch_size):
