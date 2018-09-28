@@ -146,16 +146,15 @@ def eval(args,
                                 sources_raw[b].data.numpy(),
                                 n_sources[0].data.numpy())
 
-
-                print("SDR: {} SIR: {} SAR: {}".format(sdr, sir, sar))
-                # embedding_mask = r_kmeans()
+                update_history.values_update([('sdr', sdr),
+                                              ('sir', sir),
+                                              ('sar', sar)],
+                                             history,
+                                             update_mode='batch')
 
             before = time.time()
             bar.next()
         bar.finish()
-
-        pprint(timing_dic)
-    pprint(history['loss'][-1])
 
 
 def convergence_of_LSTM(args):
@@ -194,6 +193,14 @@ def convergence_of_LSTM(args):
         if epoch % 1 == 0:
             eval(args, model, val_generator, mean_tr,
                  std_tr, epoch, history, n_val_batches)
+
+            update_history.values_update([('sdr', None),
+                                          ('sir', None),
+                                          ('sar', None)],
+                                         history,
+                                         update_mode='epoch')
+        pprint(history)
+
 
 if __name__ == "__main__":
     args = parser.get_args()

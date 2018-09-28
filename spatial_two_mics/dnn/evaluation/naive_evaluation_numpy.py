@@ -48,8 +48,6 @@ def naive_cpu_bss_eval(embedding_labels,
                        n_sources):
 
     mix_stft = mix_real_tf + 1j*mix_imag_tf
-    print("Constructed mixture stft and it has a shape of:")
-    print(mix_stft.shape)
     embedding_clustered = embedding_labels.reshape(mix_stft.shape)
 
     sdr_t, sir_t, sar_t = 0., 0., 0.
