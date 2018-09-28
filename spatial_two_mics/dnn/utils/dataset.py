@@ -170,12 +170,15 @@ def get_data_generator(args,
                         'shuffle': True,
                         'num_workers': args.num_workers,
                         'drop_last': True}
-    data_generator = DataLoader(data, **generator_params)
+    data_generator = DataLoader(data,
+                                **generator_params,
+                                pin_memory=False)
+    n_batches = int(len(data) / args.batch_size)
     if return_stats:
         mean, std = data.extract_stats()
-        return data_generator, mean, std
+        return data_generator, mean, std, n_batches
     else:
-        return data_generator
+        return data_generator, n_batches
 
 
 def concatenate_for_masks(masks, n_sources, batch_size):
