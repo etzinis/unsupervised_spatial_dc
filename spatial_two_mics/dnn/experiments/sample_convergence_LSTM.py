@@ -190,7 +190,7 @@ def convergence_of_LSTM(args):
                                      history,
                                      update_mode='epoch')
 
-        if epoch % 1 == 0:
+        if epoch % 5 == 0:
             eval(args, model, val_generator, mean_tr,
                  std_tr, epoch, history, n_val_batches)
 
@@ -199,7 +199,13 @@ def convergence_of_LSTM(args):
                                           ('sar', None)],
                                          history,
                                          update_mode='epoch')
-        pprint(history)
+
+        pprint(history['loss'][-1])
+        pprint(history['sdr'][-1])
+        pprint(history['sir'][-1])
+        pprint(history['sar'][-1])
+        print("BEST SDR: {}, SIR: {}, SAR {}".format(max(history['sdr']),
+              max(history['sir']), max(history['sar'])))
 
 
 if __name__ == "__main__":
