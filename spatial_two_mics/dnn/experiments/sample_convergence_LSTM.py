@@ -28,6 +28,10 @@ import spatial_two_mics.dnn.utils.experiment_command_line_parser as \
     parser
 import spatial_two_mics.dnn.utils.update_history as update_history
 from progress.bar import ChargingBar
+import spatial_two_mics.utils.robust_means_clustering as robust_kmeans
+import spatial_two_mics.dnn.evaluation.naive_evaluation_numpy as  \
+    numpy_eval
+from sklearn.preprocessing import StandardScaler
 
 
 def train(args,
@@ -83,6 +87,7 @@ def train(args,
 
         update_history.values_update([('loss', naive_loss)],
                                      history, update_mode='batch')
+        before = time.time()
         bar.next()
     bar.finish()
 
@@ -100,11 +105,18 @@ def eval(args,
     timing_dic = {'Loading batch': 0.,
                   'Transformations and Forward': 0.,
                   'BSS CPU evaluation': 0.}
+    r_kmeans = robust_kmeans.RobustKmeans(
+        n_true_clusters=args.n_sources,
+        n_used_clusters=args.n_sources)
+    z_scaler = StandardScaler()
+
     # make some evaluation
     model.eval()
+    before = time.time()
     with torch.no_grad():
         bar = ChargingBar("Evaluating for epoch: {}...".format(epoch),
                           max=n_batches)
+        before = time.time()
         for batch_data in val_generator:
             (abs_tfs, real_tfs, imag_tfs,
              duet_masks, ground_truth_masks,
@@ -121,12 +133,24 @@ def eval(args,
             input_tfs /= std_tr
 
             vs = model(input_tfs)
+            for b in np.arange(vs.size(0)):
+                embedding_features = z_scaler.fit_transform(
+                                     vs[b, :, :].data.cpu().numpy())
 
-            print("Extracted the embeddings!")
-            print(vs.shape)
-            input()
+                embedding_labels = r_kmeans.fit(embedding_features)
+
+                sdr, sir, sar = numpy_eval.naive_cpu_bss_eval(
+                                embedding_labels,
+                                real_tfs[b].data.numpy(),
+                                imag_tfs[b].data.numpy(),
+                                sources_raw[b].data.numpy(),
+                                n_sources[0].data.numpy())
 
 
+                print("SDR: {} SIR: {} SAR: {}".format(sdr, sir, sar))
+                # embedding_mask = r_kmeans()
+
+            before = time.time()
             bar.next()
         bar.finish()
 
