@@ -76,7 +76,8 @@ def example_of_usage(args):
     print(visible_cuda_ids)
     print(torch.cuda.current_device())
 
-    training_generator = data_generator.get_data_generator(args)
+    training_generator, n_batches = data_generator.get_data_generator(
+        args)
     timing_dic = {}
 
     before = time.time()
