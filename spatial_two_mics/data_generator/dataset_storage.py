@@ -23,11 +23,11 @@ import spatial_two_mics.data_generator.dataset_generator as generator
 
 def create_dataset_name(args):
     dataset_name = '{}_{}_{}_{}_{}'.format(
-                    args.dataset,
-                    '_'.join(map(str, args.n_samples)),
-                    args.n_sources,
-                    ''.join(sorted(args.genders)),
-                    'taus'.join(map(str,  args.force_delays)))
+                    args['dataset'],
+                    '_'.join(map(str, args['n_samples'])),
+                    args['n_sources'],
+                    ''.join(sorted(args['genders'])),
+                    'taus'.join(map(str,  args['force_delays'])))
     return dataset_name
 
 
@@ -35,6 +35,13 @@ def get_mixture_name_and_data_to_save(mix_info):
     name = [s_id['speaker_id']+'-'+s_id['sentence_id']
             for s_id in mix_info['sources_ids']]
     name = '_'.join(name)
+
+    # don't save also the wavs, read them real time 
+    for i, source_info in enumerate(mix_info['sources_ids']):
+        try:
+            del mix_info['sources_ids'][i]['wav']
+        except:
+            pass
 
     data = {
         'positions': mix_info['positions'],
@@ -69,7 +76,8 @@ def time_loading_comparison(data, f_path):
 
 def store_dataset(dataset_dic, args):
 
-    dataset_name = create_dataset_name(args)
+    dataset_params = args.__dict__
+    dataset_name = create_dataset_name(dataset_params)
 
     dataset_path = os.path.join(args.output_path, dataset_name)
     if not os.path.exists(dataset_path):
