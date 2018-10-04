@@ -58,6 +58,12 @@ def get_args():
     parser.add_argument("--epochs", type=int,
                         help="""The number of epochs that the 
                         experiment should run""", default=50)
+    parser.add_argument("--evaluate_per", type=int,
+                        help="""The number of trianing epochs in 
+                        order to run an evaluation""", default=5)
+    parser.add_argument("--n_eval", type=int,
+                        help="""Reduce the number of eavluation 
+                        samples to this number.""", default=256)
     parser.add_argument("-lr", "--learning_rate", type=float,
                         help="""Initial Learning rate""", default=1e-3)
     parser.add_argument("--bidirectional", action='store_true',
