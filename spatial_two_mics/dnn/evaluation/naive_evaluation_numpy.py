@@ -59,7 +59,7 @@ def naive_cpu_bss_eval(embedding_labels,
         bss_results = [bss_eval(reconstructed, j, sources_raw)
                        for j in np.arange(n_sources)]
 
-        sdr, sir, sar = sorted(bss_results, key=lambda x: x[0])[0]
+        sdr, sir, sar = sorted(bss_results, key=lambda x: x[0])[-1]
         sdr_t += sdr
         sir_t += sir
         sar_t += sar
