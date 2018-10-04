@@ -51,6 +51,7 @@ class PytorchMixtureDataset(Dataset):
                  hop_length=128,
                  mixture_duration=2.0,
                  force_delays=[-1, 1],
+                 get_top=None,
                  **kwargs):
 
         self.dataset_params = {
@@ -81,6 +82,9 @@ class PytorchMixtureDataset(Dataset):
 
         self.data_paths = glob2.glob(os.path.join(self.dataset_dirpath,
                                                   '*'))
+        if get_top is not None:
+            self.data_paths = self.data_paths[:get_top]
+
         self.n_samples = len(self.data_paths)
 
         self.mix_creator = mixture_creator.AudioMixtureConstructor(
@@ -164,8 +168,10 @@ class PytorchMixtureDataset(Dataset):
 
 
 def get_data_generator(args,
-                       return_stats=False):
-    data = PytorchMixtureDataset(**args.__dict__)
+                       return_stats=False,
+                       get_top=None):
+    data = PytorchMixtureDataset(**args.__dict__,
+                                 get_top=get_top)
     generator_params = {'batch_size': args.batch_size,
                         'shuffle': True,
                         'num_workers': args.num_workers,
