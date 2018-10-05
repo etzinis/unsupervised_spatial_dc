@@ -104,7 +104,8 @@ def eval(args,
          n_batches):
     timing_dic = {'Loading batch': 0.,
                   'Transformations and Forward': 0.,
-                  'BSS CPU evaluation': 0.}
+                  'BSS CPU evaluation': 0.,
+                  'Kmeans evaluation': 0.}
     r_kmeans = robust_kmeans.RobustKmeans(
         n_true_clusters=args.n_sources,
         n_used_clusters=args.n_sources)
@@ -162,12 +163,14 @@ def convergence_of_LSTM(args):
     os.environ["CUDA_VISIBLE_DEVICES"] = visible_cuda_ids
 
     (training_generator, mean_tr, std_tr, n_tr_batches) = \
-        data_generator.get_data_generator(args, return_stats=True)
+        data_generator.get_data_generator(args,
+                                          return_stats=True)
     
     val_args = copy.copy(args)
     val_args.partition = 'val'
     val_generator, n_val_batches = \
-        data_generator.get_data_generator(val_args)
+        data_generator.get_data_generator(val_args,
+                                          get_top=args.n_eval)
 
     model = LSTM_enc.BLSTMEncoder(num_layers=args.n_layers,
                                   hidden_size=args.hidden_size,
@@ -190,7 +193,7 @@ def convergence_of_LSTM(args):
                                      history,
                                      update_mode='epoch')
 
-        if epoch % 5 == 0:
+        if epoch % args.evaluate_per == 0:
             eval(args, model, val_generator, mean_tr,
                  std_tr, epoch, history, n_val_batches)
 
