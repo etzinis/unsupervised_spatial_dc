@@ -54,6 +54,7 @@ class PytorchMixtureDataset(Dataset):
                  mixture_duration=2.0,
                  force_delays=[-1, 1],
                  get_top=None,
+                 labels_mask='duet',
                  **kwargs):
 
         self.dataset_params = {
@@ -63,97 +64,130 @@ class PytorchMixtureDataset(Dataset):
             'genders': genders,
             'force_delays': force_delays
         }
+
+        if labels_mask == 'duet' or labels_mask == 'ground_truth':
+            self.selected_mask = labels_mask
+        else:
+            raise NotImplementedError("There is no available mask "
+                                      "called: {}".format(labels_mask))
+        self.partition = partition
+
         dataset_name = dataset_storage.create_dataset_name(
-                                       self.dataset_params)
+            self.dataset_params)
 
         self.dataset_dirpath = os.path.join(
-                               config.DATASETS_DIR,
-                               dataset_name,
-                               partition)
+            config.DATASETS_DIR,
+            dataset_name,
+            partition)
 
         self.dataset_stats_path = self.dataset_dirpath + '_stats'
 
         if not os.path.isdir(self.dataset_dirpath):
             raise IOError("Dataset folder {} not found!".format(
-                          self.dataset_dirpath))
+                self.dataset_dirpath))
         else:
             print("Loading files from {} ...".format(
-                  self.dataset_dirpath))
+                self.dataset_dirpath))
 
         self.mixture_folders = glob2.glob(os.path.join(
-                               self.dataset_dirpath, '*'))
+            self.dataset_dirpath, '*'))
         if get_top is not None:
             self.mixture_folders = self.mixture_folders[:get_top]
 
         self.n_samples = len(self.mixture_folders)
 
+        # preprocess -- store all absolute spectra values for faster
+        # loading during run time
+        self.store_directly_abs_spectra()
+
     def __len__(self):
         return self.n_samples
 
     def __getitem__(self, idx):
-        file_path = self.data_paths[idx]
+        """!
+        Depending on the selected partition it returns accordingly
+        the following objects:
+
+        if self.partition == 'train':
+            (abs_tfs, selected_mask)
+        else if partition == 'test' or 'val'
+            (abs_tfs, selected_mask, wavs_list, real_tfs, imag_tfs)"""
+        mix_folder = self.mixture_folders[idx]
         try:
-            mixture_info = joblib.load(file_path)
+            abs_tfs = joblib.load(os.path.join(mix_folder, 'abs_tfs'))
         except:
             raise IOError("Failed to load data from path: {} "
-                          "using joblib.".format(file_path))
+                          "for absolute spectra.".format(mix_folder))
 
-        tf_info = self.mix_creator.construct_mixture(mixture_info)
-        mixture_tf = tf_info['m1_tf']
-        abs_tf = abs(mixture_tf)
-        real_tf = np.real(mixture_tf)
-        imag_tf = np.imag(mixture_tf)
-
-        # assert (real_tf + 1j * imag_tf == mixture_tf).all()
-
-        duet_mask = None
-        ground_truth_mask = None
-        try:
-            duet_mask = mixture_info['soft_labeled_mask']
-        except:
-            raise KeyError("Mixture info does not have a soft label "
-                           "attribute inferred by duet algorithm")
 
         try:
-            ground_truth_mask = mixture_info['ground_truth_mask']
+            if self.selected_mask == 'duet':
+                mask = joblib.load(os.path.join(mix_folder,
+                                                'soft_labeled_mask'))
+            else:
+                mask = joblib.load(os.path.join(mix_folder,
+                                                'ground_truth_mask'))
         except:
-            raise KeyError("Mixture info does not have a ground truth "
-                           "mask inferred by the most dominant source "
-                           "in each TF bin.")
+            raise IOError("Failed to load data from path: {} "
+                          "for tf label masks".format(mix_folder))
 
-        sources_raw = np.array(tf_info['sources_raw'])
-        amplitudes = np.array(mixture_info['positions']['amplitudes'])
-        n_sources = len(sources_raw)
+        if self.partition == 'train':
+            return abs_tfs, mask
 
-        return (abs_tf, real_tf, imag_tf,
-                duet_mask, ground_truth_mask,
-                sources_raw, amplitudes, n_sources)
+        try:
+            real_p = os.path.join(mix_folder, 'real_tfs')
+            imag_p = os.path.join(mix_folder, 'imag_tfs')
+            wavs_p= os.path.join(mix_folder, 'wavs')
+            real_tfs = joblib.load(real_p)
+            imag_tfs = joblib.load(imag_p)
+            wavs_list = joblib.load(wavs_p)
+        except:
+            raise IOError("Failed to load data from path: {} "
+                          "for real, imag tf of the mixture and "
+                          "wavs".format(mix_folder))
+
+        return abs_tfs, mask, wavs_list, real_tfs, imag_tfs
+
+    def store_directly_abs_spectra(self):
+        for mix_folder in self.mixture_folders:
+            try:
+                real_p = os.path.join(mix_folder, 'real_tfs')
+                imag_p = os.path.join(mix_folder, 'imag_tfs')
+                real_tfs = joblib.load(real_p)
+                imag_tfs = joblib.load(imag_p)
+            except:
+                raise IOError("Failed to load data from path: {} "
+                              "using joblib.".format(mix_folder))
+            abs_tfs = np.abs(real_tfs + 1j * imag_tfs)
+            abs_p = os.path.join(mix_folder, 'abs_tfs')
+            try:
+                joblib.dump(abs_tfs, abs_p, compress=0)
+            except:
+                raise IOError("Failed to save absolute value of "
+                              "spectra in path: {}".format(abs_p))
 
     def extract_stats(self):
         if not os.path.lexists(self.dataset_stats_path):
             mean = 0.
             std = 0.
-            for file_path in self.data_paths:
+            for mix_folder in self.mixture_folders:
                 try:
-                    mix_info = joblib.load(file_path)
+                    abs_p = os.path.join(mix_folder, 'abs_tfs')
+                    abs_tfs = joblib.load(abs_p)
                 except:
-                    raise IOError("Failed to load data from path: {} "
-                                  "using joblib.".format(file_path))
+                    raise IOError("Failed to load absolute tf "
+                                  "representation from path: {} "
+                                  "using joblib.".format(abs_p))
 
-                tf_info = self.mix_creator.construct_mixture(mix_info)
-                mixture_tf = tf_info['m1_tf']
-                abs_tf = abs(mixture_tf)
-                mean += np.mean(np.mean(abs_tf))
-                std += np.std(abs_tf)
+                mean += np.mean(np.mean(abs_tfs))
+                std += np.std(abs_tfs)
             mean /= self.__len__()
             std /= self.__len__()
 
-        #     store them for later usage
+            #     store them for later usage
             joblib.dump((mean, std), self.dataset_stats_path)
             print("Saving dataset mean and variance in: {}".format(
-                  self.dataset_stats_path))
-            return mean, std
-
+                self.dataset_stats_path))
         else:
             mean, std = joblib.load(self.dataset_stats_path)
 
@@ -212,70 +246,53 @@ def example_of_usage(args):
     import time
 
     training_data = PytorchMixtureDataset(**args.__dict__)
-    print(training_data.mixture_folders)
-    # mean, std = training_data.extract_stats()
-    #
-    # generator_params = {'batch_size': 128,
-    #                     'shuffle': True,
-    #                     'num_workers': 1,
-    #                     'drop_last': True}
-    # training_generator = DataLoader(training_data, **generator_params)
-    # device = torch.device("cuda")
-    #
-    # timing_dic = {}
-    #
-    # batch_now = time.time()
-    # # just iterate over the data
-    # for batch_data in training_generator:
-    #     timing_dic['Loading batch'] = time.time() - batch_now
-    #     batch_now = time.time()
-    #
-    #     before = time.time()
-    #     (abs_tfs, real_tfs, imag_tfs,
-    #      duet_masks, ground_truth_masks,
-    #      sources_raw, amplitudes, n_sources) = batch_data
-    #     now = time.time()
-    #     timing_dic['Loading from disk'] = now-before
-    #
-    #     before = time.time()
-    #     input_tf, masks_tf = abs_tfs.to(device), duet_masks.to(device)
-    #     now = time.time()
-    #     timing_dic['Loading to GPU'] = now - before
-    #
-    #
-    #     before = time.time()
-    #     duet_stack = concatenate_for_masks(duet_masks,
-    #                                        args.n_sources,
-    #                                        generator_params['batch_size'])
-    #     gt_stack = concatenate_for_masks(ground_truth_masks,
-    #                                      args.n_sources,
-    #                                      generator_params['batch_size'])
-    #     now = time.time()
-    #     timing_dic['Stacking in appropriate dimensions the masks'] = \
-    #         now - before
-    #
-    #     before = time.time()
-    #     duet_copy = initialize_and_copy_masks(duet_masks,
-    #                                           args.n_sources,
-    #                                           generator_params[
-    #                                               'batch_size'],
-    #                                           device)
-    #
-    #     gt_copy = initialize_and_copy_masks(ground_truth_masks,
-    #                                         args.n_sources,
-    #                                         generator_params[
-    #                                           'batch_size'],
-    #                                         device)
-    #     now = time.time()
-    #     timing_dic['Initializing and copying for masks'] = now - before
-    #
-    #     assert torch.equal(duet_copy, duet_stack)
-    #     assert torch.equal(gt_copy, gt_stack)
-    #
-    #
-    #     # torch.cuda.empty_cache()
-    #     pprint(timing_dic)
-    #     batch_now = time.time()
+    mean, std = training_data.extract_stats()
+    generator_params = {'batch_size': 128,
+                        'shuffle': True,
+                        'num_workers': 1,
+                        'drop_last': True}
+    training_generator = DataLoader(training_data, **generator_params)
+    device = torch.device("cuda")
+
+    timing_dic = {}
+    n_sources = 2
+
+    batch_now = time.time()
+    # just iterate over the data
+    for batch_data in training_generator:
+        timing_dic['Loading batch'] = time.time() - batch_now
+        batch_now = time.time()
+
+        before = time.time()
+        (abs_tfs, masks) = batch_data
+        now = time.time()
+        timing_dic['Loading from disk'] = now-before
+
+        before = time.time()
+        input_tf, masks_tf = abs_tfs.to(device), masks.to(device)
+        now = time.time()
+        timing_dic['Loading to GPU'] = now - before
+
+
+        before = time.time()
+        duet_stack = concatenate_for_masks(masks,
+                                           n_sources,
+                                           generator_params['batch_size'])
+        now = time.time()
+        timing_dic['Stacking in appropriate dimensions the masks'] = \
+            now - before
+
+        before = time.time()
+        duet_copy = initialize_and_copy_masks(masks,
+                                              n_sources,
+                                              generator_params[
+                                                  'batch_size'],
+                                              device)
+        now = time.time()
+        timing_dic['Initializing and copying for masks'] = now - before
+
+        pprint(timing_dic)
+        batch_now = time.time()
 
 
 def get_args():
