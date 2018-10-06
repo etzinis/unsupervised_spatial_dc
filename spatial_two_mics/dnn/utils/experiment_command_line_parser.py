@@ -46,7 +46,11 @@ def get_args():
     parser.add_argument("-name", "--experiment_name", type=str,
                         help="""The name or identifier of this 
                         experiment""",
-                        default='A sample experiment')
+                        default='A sample experiment'),
+    parser.add_argument("-mt", "--labels_mask", type=str,
+                        help="""The type of masks that you want to 
+                        use -- 'ground_truth' or 'duet'""",
+                        default='duet')
     parser.add_argument("-cad", "--cuda_available_devices", type=int,
                         nargs="+",
                         help="""A list of Cuda IDs that would be 
