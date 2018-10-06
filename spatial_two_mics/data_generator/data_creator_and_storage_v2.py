@@ -320,7 +320,7 @@ class RandomCombinations(ArtificialDatasetCreator):
         # their need
         for k, v in data.items():
             file_path = os.path.join(folder_path, k)
-            joblib.dump(v, file_path, compress=3)
+            joblib.dump(v, file_path, compress=0)
         return 1
 
     def combination_process_wrapper(self,
