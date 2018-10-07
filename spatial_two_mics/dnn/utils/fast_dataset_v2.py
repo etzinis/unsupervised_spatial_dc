@@ -141,6 +141,7 @@ class PytorchMixtureDataset(Dataset):
             real_tfs = joblib.load(real_p)
             imag_tfs = joblib.load(imag_p)
             wavs_list = joblib.load(wavs_p)
+            wavs_list = np.array(wavs_list)
         except:
             raise IOError("Failed to load data from path: {} "
                           "for real, imag tf of the mixture and "
@@ -150,6 +151,10 @@ class PytorchMixtureDataset(Dataset):
 
     def store_directly_abs_spectra(self):
         for mix_folder in self.mixture_folders:
+            abs_p = os.path.join(mix_folder, 'abs_tfs')
+            if os.path.lexists(abs_p):
+                continue
+
             try:
                 real_p = os.path.join(mix_folder, 'real_tfs')
                 imag_p = os.path.join(mix_folder, 'imag_tfs')
@@ -159,7 +164,6 @@ class PytorchMixtureDataset(Dataset):
                 raise IOError("Failed to load data from path: {} "
                               "using joblib.".format(mix_folder))
             abs_tfs = np.abs(real_tfs + 1j * imag_tfs)
-            abs_p = os.path.join(mix_folder, 'abs_tfs')
             try:
                 joblib.dump(abs_tfs, abs_p, compress=0)
             except:
