@@ -51,6 +51,39 @@ def efficient_frobenius(vs, ys, eps=10e-12):
     return total_loss / vs.size(0)
 
 
+def paris_naive(vs, ys):
+    """! Computing naively the loss function between embedding
+    vectors vs and ideal affinity matrices ys
+
+    :param vs: size: batch_size x n_elements x embedded_features
+    :param ys: One hot tensor corresponding to 1 where a specific
+    class is the label for one element or 0 otherwise and its size:
+    batch_size x n_elements x n_classes
+    :return: The computed loss of these two tensors
+    """
+    loss = torch.mean(torch.matmul(vs.transpose(1, 2), vs) ** 2) \
+         - 2. * torch.mean(torch.matmul(vs.transpose(1, 2), ys) ** 2) \
+         + torch.mean(torch.matmul(ys.transpose(1, 2), ys) ** 2)
+    return loss
+
+
+
+def thymios_naive(vs, ys):
+    """! Computing naively the loss function between embedding
+    vectors vs and ideal affinity matrices ys
+
+    :param vs: size: batch_size x n_elements x embedded_features
+    :param ys: One hot tensor corresponding to 1 where a specific
+    class is the label for one element or 0 otherwise and its size:
+    batch_size x n_elements x n_classes
+    :return: The computed loss of these two tensors
+    """
+    l = torch.sqrt((torch.matmul(vs.transpose(1, 2), vs) ** 2).sum()) \
+        - 2.*torch.sqrt((torch.matmul(vs.transpose(1, 2), ys) **2).sum()) \
+        + torch.sqrt((torch.matmul(ys.transpose(1, 2), ys) ** 2).sum())
+    return l / vs.size(0)
+
+
 def naive(vs, ys):
     """! Computing naively the loss function between embedding
     vectors vs and ideal affinity matrices ys
