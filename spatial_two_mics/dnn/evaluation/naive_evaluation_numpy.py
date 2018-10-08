@@ -9,6 +9,7 @@ SIR and SBR for the reconstructed signals and the true signals
 
 import numpy as np
 import librosa
+import os
 
 
 def bss_eval(sep, i, sources):
@@ -45,7 +46,8 @@ def naive_cpu_bss_eval(embedding_labels,
                        mix_real_tf,
                        mix_imag_tf,
                        sources_raw,
-                       n_sources):
+                       n_sources,
+                       batch_index=0):
 
     mix_stft = mix_real_tf + 1j*mix_imag_tf
     embedding_clustered = embedding_labels.reshape(mix_stft.shape)
@@ -63,5 +65,11 @@ def naive_cpu_bss_eval(embedding_labels,
         sdr_t += sdr
         sir_t += sir
         sar_t += sar
+
+        save_p = '/home/thymios/wavs/'
+        wav_p = os.path.join(save_p,
+                             'batch_{}_source_{}'.format(
+                                 batch_index + 1, i + 1))
+        librosa.output.write_wav(wav_p, reconstructed, 16000)
 
     return sdr_t/n_sources, sir_t/n_sources, sar_t/n_sources
