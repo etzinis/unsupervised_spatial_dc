@@ -50,7 +50,14 @@ def naive_cpu_bss_eval(embedding_labels,
                        batch_index=0):
 
     mix_stft = mix_real_tf + 1j*mix_imag_tf
-    embedding_clustered = embedding_labels.reshape(mix_stft.shape)
+    # print("Shape of mix stft")
+    # print(mix_stft.shape)
+    # print(embedding_labels.T.reshape(mix_stft.shape[::-1]).T[:5, :5])
+    # print(embedding_labels.reshape(mix_stft.shape[::-1]).T[:5, :5])
+    # print(embedding_labels.reshape(mix_stft.shape)[:5, :5])
+
+    embedding_clustered = embedding_labels.reshape(
+                          mix_stft.shape[::-1]).T
 
     sdr_t, sir_t, sar_t = 0., 0., 0.
     for i in np.arange(n_sources):
@@ -66,10 +73,10 @@ def naive_cpu_bss_eval(embedding_labels,
         sir_t += sir
         sar_t += sar
 
-        save_p = '/home/thymios/wavs/'
-        wav_p = os.path.join(save_p,
-                             'batch_{}_source_{}'.format(
-                                 batch_index + 1, i + 1))
-        librosa.output.write_wav(wav_p, reconstructed, 16000)
+        # save_p = '/home/thymios/wavs/'
+        # wav_p = os.path.join(save_p,
+        #                      'batch_{}_source_{}'.format(
+        #                          batch_index + 1, i + 1))
+        # librosa.output.write_wav(wav_p, reconstructed, 16000)
 
     return sdr_t/n_sources, sir_t/n_sources, sar_t/n_sources

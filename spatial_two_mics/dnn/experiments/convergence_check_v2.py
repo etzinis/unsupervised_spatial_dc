@@ -34,6 +34,7 @@ import spatial_two_mics.dnn.evaluation.naive_evaluation_numpy as \
     numpy_eval
 from sklearn.preprocessing import StandardScaler
 from sklearn.cluster import KMeans
+import librosa
 
 
 def train(args,
@@ -60,30 +61,32 @@ def train(args,
         # the input sequence is determined by time and not freqs
         # before: input_tfs = batch_size x (n_fft/2+1) x n_timesteps
         input_tfs = input_tfs.permute(0, 2, 1).contiguous()
+        index_ys = index_ys.permute(0, 2, 1).contiguous()
 
         # normalize with mean and variance from the training dataset
         input_tfs -= mean_tr
         input_tfs /= std_tr
 
-        index_ys = index_ys.permute(0, 2, 1).contiguous()
+        # index_ys = index_ys.permute(0, 2, 1).contiguous()
         one_hot_ys = converters.one_hot_3Dmasks(index_ys,
                                                 args.n_sources)
 
         optimizer.zero_grad()
         vs = model(input_tfs)
 
-        # flatened_ys = one_hot_ys.view(one_hot_ys.size(0),
-        #                               -1,
-        #                               one_hot_ys.size(-1)).cuda()
+        flatened_ys = one_hot_ys.view(one_hot_ys.size(0),
+                                      -1,
+                                      one_hot_ys.size(-1)).cuda()
+
         timing_dic['Transformations and Forward'] += time.time() - \
                                                      before
         before = time.time()
-        # naive_loss = affinity_losses.diagonal(vs, flatened_ys)
-        loss = affinity_losses.diagonal(vs.view(vs.size(0),
-                                                one_hot_ys.size(1),
-                                                one_hot_ys.size(2),
-                                                vs.size(-1)),
-                                        one_hot_ys.cuda())
+        loss = affinity_losses.paris_naive(vs, flatened_ys)
+        # loss = affinity_losses.diagonal(vs.view(vs.size(0),
+        #                                         one_hot_ys.size(1),
+        #                                         one_hot_ys.size(2),
+        #                                         vs.size(-1)),
+        #                                 one_hot_ys.cuda())
 
         loss.backward()
         nn.utils.clip_grad_norm(model.parameters(), 100.)
@@ -141,11 +144,16 @@ def eval(args,
                 # timing_dic['Standard Scaler'] += time.time() - before
 
                 embedding_features = vs[b, :, :].data.cpu().numpy()
+                # embedding_features = masks[b, :, :].view(-1, 1).data.numpy()
+                # embedding_labels = masks[b].data.numpy()
+                # embedding_features = flatened_ys[b, :, :].data.cpu().numpy()
+
+
 
                 # possibly perform kmeans on GPU?
                 before = time.time()
-                embedding_labels = np.array(k_means_obj.fit(
-                                   embedding_features).labels_)
+                embedding_labels = np.array(k_means_obj.fit_predict(
+                                            embedding_features))
                 timing_dic['Kmeans'] += time.time() - before
 
                 # possibly do it on GPU?
@@ -155,7 +163,8 @@ def eval(args,
                     real_tfs[b].data.numpy(),
                     imag_tfs[b].data.numpy(),
                     wavs_lists[b].data.numpy(),
-                    args.n_sources)
+                    args.n_sources,
+                    batch_index=b)
                 timing_dic['Dummy BSS evaluation'] += time.time() - before
 
                 update_history.values_update([('sdr', sdr),
