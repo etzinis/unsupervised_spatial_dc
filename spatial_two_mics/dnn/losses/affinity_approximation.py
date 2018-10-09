@@ -61,9 +61,9 @@ def paris_naive(vs, ys):
     batch_size x n_elements x n_classes
     :return: The computed loss of these two tensors
     """
-    loss = torch.mean(torch.matmul(vs.transpose(1, 2), vs) ** 2) \
-         - 2. * torch.mean(torch.matmul(vs.transpose(1, 2), ys) ** 2) \
-         + torch.mean(torch.matmul(ys.transpose(1, 2), ys) ** 2)
+    loss = torch.sqrt(torch.mean(torch.bmm(vs.transpose(1, 2), vs) ** 2)) \
+         - 2. * torch.sqrt(torch.mean(torch.bmm(vs.transpose(1, 2), ys) ** 2)) \
+         + torch.sqrt(torch.mean(torch.bmm(ys.transpose(1, 2),ys) ** 2))
     return loss
 
 
@@ -78,9 +78,9 @@ def thymios_naive(vs, ys):
     batch_size x n_elements x n_classes
     :return: The computed loss of these two tensors
     """
-    l = torch.sqrt((torch.matmul(vs.transpose(1, 2), vs) ** 2).sum()) \
-        - 2.*torch.sqrt((torch.matmul(vs.transpose(1, 2), ys) **2).sum()) \
-        + torch.sqrt((torch.matmul(ys.transpose(1, 2), ys) ** 2).sum())
+    l = torch.sqrt((torch.bmm(vs.transpose(1, 2), vs) ** 2).sum()) \
+        - 2.*torch.sqrt((torch.bmm(vs.transpose(1, 2), ys) **2).sum()) \
+        + torch.sqrt((torch.bmm(ys.transpose(1, 2), ys) ** 2).sum())
     return l / vs.size(0)
 
 
