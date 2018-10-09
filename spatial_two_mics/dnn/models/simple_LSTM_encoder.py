@@ -49,8 +49,8 @@ class BLSTMEncoder(nn.Module):
         v = nonl_embedding.contiguous().view(x.size(0),
                                              -1,
                                              self.embedding_depth)
-        return nn.functional.normalize(v, dim=-1, p=2)
-
+        # return nn.functional.normalize(v, dim=-1, p=2)
+        return v
 
 if __name__ == "__main__":
 
