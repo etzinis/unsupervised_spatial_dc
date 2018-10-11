@@ -340,6 +340,8 @@ class RandomCombinations(ArtificialDatasetCreator):
                             n_samples=None,
                             n_sources=None,
                             force_delays=None):
+        if force_delays is None:
+            force_delays = ['random_', '_delays']
         dataset_name = '{}_{}_{}_{}_{}'.format(
             self.audio_dataset_name,
             '_'.join(map(str, n_samples)),
