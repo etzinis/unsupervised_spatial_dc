@@ -55,8 +55,8 @@ class RandomCirclePositioner(object):
     def __init__(self,
                  min_angle=0.,
                  max_angle=np.pi,
-                 radius=3.0,
-                 mic_distance_percentage=0.01,
+                 radius=4.,
+                 mic_distance_percentage=0.005,
                  sound_speed=343,
                  fs=16000):
         """
@@ -107,15 +107,11 @@ class RandomCirclePositioner(object):
         taus_list = []
         for i in np.arange(n_sources):
             source = "s"+str(i+1)
-            taus_list.append(("tau"+str(i+1),
-                              distances[source+"m1"]
-                              - distances[source+"m2"]))
+            taus_list.append(distances[source+"m1"]
+                             - distances[source+"m2"])
 
-        taus = dict(taus_list)
-        for tau in taus:
-            taus[tau] *= (1. * self.fs) / self.sound_speed
-
-        return taus
+        return [(1. * self.fs * tau) / self.sound_speed
+                for tau in taus_list]
 
     def compute_distances_for_sources_and_mics(self,
                                                source_points):
@@ -133,21 +129,15 @@ class RandomCirclePositioner(object):
         return distances
 
     def get_angles(self, n_source_pairs):
-        d_thetas_list = np.random.uniform(low=self.min_angle,
-                                          high=self.max_angle,
-                                          size=n_source_pairs-1)
-        total_angle = sum(d_thetas_list)
-        if total_angle > self.max_angle:
-            d_thetas_list = [(theta * self.max_angle) / total_angle
-                             for theta in d_thetas_list]
+        thetas = np.random.uniform(low=self.min_angle,
+                                   high=self.max_angle,
+                                   size=n_source_pairs)
+        thetas = sorted(thetas)
 
-        thetas = [0.]
-        acc = 0.
-        for angle in d_thetas_list:
-            thetas.append(acc+angle)
-            acc += angle
+        d_thetas = [th2 - th1 for (th1, th2) in
+                    zip(thetas[:-1], thetas[1:])]
 
-        return thetas, d_thetas_list
+        return thetas, d_thetas
 
     def get_sources_locations(self,
                               n_source_pairs):
@@ -171,7 +161,7 @@ class RandomCirclePositioner(object):
                              'd_thetas': np.asarray(d_thetas),
                              'xy_positons': np.asarray(xys),
                              'distances': distances,
-                             'taus': np.asarray(list(taus.values())),
+                             'taus': np.asarray(taus),
                              'amplitudes': np.asarray(list(
                                            mix_amplitudes.values()))}
 
@@ -194,7 +184,7 @@ def example_of_usage():
            [-3.00000000e+00,  3.67394040e-16]])}
     """
     random_positioner = RandomCirclePositioner()
-    positions_info = random_positioner.get_sources_locations(2)
+    positions_info = random_positioner.get_sources_locations(3)
     pprint(positions_info)
 
 
