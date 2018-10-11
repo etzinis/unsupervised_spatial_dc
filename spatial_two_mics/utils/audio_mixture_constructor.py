@@ -222,11 +222,6 @@ class AudioMixtureConstructor(object):
         m1_tf = self.get_stft(m1)
         m2_tf = self.get_stft(m2)
 
-        print(m1_tf.shape)
-        print(len(m1))
-        print(len(m2))
-        print(m2_tf.shape)
-
         mixture_info = {
             'm1_raw': m1,
             'm2_raw': m2,
