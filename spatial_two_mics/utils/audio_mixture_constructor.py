@@ -20,7 +20,9 @@ class AudioMixtureConstructor(object):
                  hop_len=None,
                  force_delays=None,
                  normalize_audio_by_std=True,
-                 mixture_duration=2.0):
+                 mixture_duration=2.0,
+                 precision=0.01,
+                 freqs_included=7):
         """
         :param fs: sampling rate
         :param n_fft: FFT window size
@@ -36,6 +38,13 @@ class AudioMixtureConstructor(object):
         normalized by their std values
         :param mixture_duration: the duration on which the mixture
         would be created (in seconds)
+        :param precision: The precision as a floating number e.g. 0.01
+        if you are using floating point delays between your source
+        signals for each mixture
+        :param freqs_included: How many frequencies should be
+        included in the sinc function before convolving it with the
+        true signal in order to upsample it (1/precision) times more
+        and shift it in order to get the truly delayed signal.
         """
         self.mixture_duration = mixture_duration
         self.n_fft = n_fft
@@ -43,6 +52,13 @@ class AudioMixtureConstructor(object):
         self.hop_len = hop_len
         self.normalize_audio_by_std = normalize_audio_by_std
         self.force_delays = force_delays
+        self.precision = precision
+        self.freqs_included = freqs_included
+
+        xs = np.linspace(-self.freqs_included,
+                         self.freqs_included,
+                         2. * self.freqs_included / self.precision)
+        self.windowed_sinc = np.sinc(xs)
 
     @staticmethod
     def load_wav(source_info):
@@ -64,34 +80,104 @@ class AudioMixtureConstructor(object):
         else:
             return signal[:delay]
 
-    def construct_delayed_signals(self,
-                                  signals,
-                                  taus):
+    def enforce_float_delays(self,
+                             source_signals,
+                             delays_for_sources,
+                             fs):
+        """!
+        For 2 microphone enforce a floating point number delay with some
+        selected precision and apply that for all sources that would
+        be given. Also make sure that the required to be returned
+        wavs have to have a length equal to the duration"""
+        upsampling_rate = int(1. / self.precision)
+        duration_in_samples = int(self.mixture_duration * fs) - 1
+        decimals = int(np.log10(upsampling_rate))
+        n_augmentation_zeros = upsampling_rate - 1
+
+        rounded_taus = np.around(delays_for_sources, decimals=decimals)
+        taus_samples = upsampling_rate * rounded_taus
+        taus_samples = taus_samples.astype(int)
+
+        mic_signals = {'m1':[], 'm2':[]}
+        for src_id, source_sig in enumerate(source_signals):
+            sig_len = source_sig.shape[0]
+            augmented_signal = np.zeros(
+                sig_len + (sig_len - 1) * n_augmentation_zeros)
+            augmented_signal[::upsampling_rate] = source_sig
+            est_augmented_sig = np.convolve(augmented_signal,
+                                            self.windowed_sinc,
+                                            mode='valid')
+
+            tau_in_samples = taus_samples[src_id]
+            if tau_in_samples > 0:
+                source_in_mic1 = est_augmented_sig[
+                                 tau_in_samples:][::upsampling_rate]
+                source_in_mic2 = est_augmented_sig[
+                                 :-tau_in_samples][::upsampling_rate]
+            elif tau_in_samples < 0:
+                source_in_mic1 = est_augmented_sig[
+                                 :tau_in_samples][::upsampling_rate]
+                source_in_mic2 = est_augmented_sig[
+                                 -tau_in_samples:][::upsampling_rate]
+            else:
+                source_in_mic1 = est_augmented_sig[::upsampling_rate]
+                source_in_mic2 = est_augmented_sig[::upsampling_rate]
+
+            # check the duration which is very important
+            if (len(source_in_mic1) < duration_in_samples or
+                    len(source_in_mic2) < duration_in_samples):
+                raise ValueError("Duration given: {} could "
+                                 "not be sufficed before the gven source"
+                                 " signal has a lesser duration of {} "
+                                 "after the float delay.".format(
+                    duration_in_samples, len(source_in_mic1)))
+
+            mic_signals['m1'].append(
+                        source_in_mic1[:duration_in_samples])
+            mic_signals['m2'].append(
+                        source_in_mic2[:duration_in_samples])
+
+        return mic_signals
+
+    def construct_mic_signals(self,
+                              source_signals,
+                              delays_for_sources):
         """!
         This function might extend to any real delay by interpolation
-        of the source signals
+        of the source signals or just forcing a delay over the sources.
+        After that it returns a dictionary containing a list of signals
+        for each microphone. also cropped to the duration specified.
 
         :return mic_signals ={ 'm1': [s1, s2, ..., sn], 'm2': same }
         """
 
+        fs = source_signals[0][1]
+        assert all([sr == fs for (s, sr) in source_signals]), 'When ' \
+               'trying to enforce the delays over the source signals ' \
+               'the fs should be the same for all sources!'
+
         if self.force_delays is None:
-            raise NotImplementedError("A real value delay should be "
-                                      "implemented by utilizing "
-                                      "interpolation. Currently "
-                                      "Unavailable.")
+            mic_signals = self.enforce_float_delays(
+                           [s for (s, sr) in source_signals],
+                           delays_for_sources,
+                           fs)
 
         else:
         # naive way in order to force a delay for DUET algorithm
             m1_delays = self.force_delays
             m2_delays = self.force_delays[::-1]
-            mic_delays = {
+
+            cropped_signals = [s[:int(self.mixture_duration * fs)]
+                               for (s, sr) in source_signals]
+
+            mic_signals = {
                 'm1': [self.force_delay_on_signal(s, m1_delays[i])
-                       for (i, s) in enumerate(signals)],
+                       for (i, s) in enumerate(cropped_signals)],
                 'm2': [self.force_delay_on_signal(s, m2_delays[i])
-                       for (i, s) in enumerate(signals)]
+                       for (i, s) in enumerate(cropped_signals)]
             }
 
-        return mic_delays
+        return mic_signals
 
     def get_tf_representations(self,
                                mixture_info):
@@ -120,13 +206,10 @@ class AudioMixtureConstructor(object):
         positions = mixture_info['positions']
         source_signals = [(s['wav'], s['fs'])
                           for s in mixture_info['sources_ids']]
+        n_sources = len(source_signals)
 
-        cropped_signals = [s[:int(self.mixture_duration * fs)]
-                           for (s, fs) in source_signals]
-        n_sources = len(cropped_signals)
-
-        mic_signals = self.construct_delayed_signals(cropped_signals,
-                                                     positions['taus'])
+        mic_signals = self.construct_mic_signals(source_signals,
+                                                 positions['taus'])
 
         m1 = sum([positions['amplitudes'][i] * mic_signals['m1'][i]
                   for i in np.arange(n_sources)])
@@ -138,6 +221,11 @@ class AudioMixtureConstructor(object):
 
         m1_tf = self.get_stft(m1)
         m2_tf = self.get_stft(m2)
+
+        print(m1_tf.shape)
+        print(len(m1))
+        print(len(m2))
+        print(m2_tf.shape)
 
         mixture_info = {
             'm1_raw': m1,
