@@ -51,7 +51,8 @@ class RandomCombinations(ArtificialDatasetCreator):
                  mixture_distribution=None,
                  create_val_set=False,
                  subset_of_speakers='train',
-                 min_duration=2.0):
+                 min_duration=2.0,
+                 convolution_offset=2000):
 
         super(RandomCombinations,
               self).__init__(audio_dataset_name=audio_dataset_name)
@@ -83,6 +84,7 @@ class RandomCombinations(ArtificialDatasetCreator):
                               if s not in self.val_speakers]
 
         self.min_samples = int(min_duration * self.fs)
+        self.convolution_offset = convolution_offset
 
     def get_available_speakers(self,
                                subset_of_speakers):
@@ -155,7 +157,7 @@ class RandomCombinations(ArtificialDatasetCreator):
             # check whether all the signals have the appropriate
             # duration
             signals = [(len(self.get_wav(speakers_dic, source_info))
-                        >= self.min_samples)
+                        >= self.min_samples + self.convolution_offset)
                        for source_info in possible_comb]
             if not all(signals):
                 continue
