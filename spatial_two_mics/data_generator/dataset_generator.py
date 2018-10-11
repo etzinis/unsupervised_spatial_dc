@@ -122,7 +122,8 @@ class RandomCombinations(ArtificialDatasetCreator):
                                             possible_sources,
                                             speakers_dic,
                                             n_mixed_sources=2,
-                                            n_mixtures=0):
+                                            n_mixtures=0,
+                                            convolution_offset=2000):
         mixtures_generator = self.random_combinations(possible_sources,
                                                       n_mixed_sources)
 
@@ -151,7 +152,7 @@ class RandomCombinations(ArtificialDatasetCreator):
             # check whether all the signals have the appropriate
             # duration
             signals = [(len(self.get_wav(speakers_dic, source_info))
-                        >= self.min_samples)
+                        >= self.min_samples + convolution_offset)
                        for source_info in possible_comb]
             if not all(signals):
                 continue
