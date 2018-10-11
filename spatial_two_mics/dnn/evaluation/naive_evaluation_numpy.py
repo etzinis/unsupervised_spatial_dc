@@ -50,14 +50,12 @@ def naive_cpu_bss_eval(embedding_labels,
                        batch_index=0):
 
     mix_stft = mix_real_tf + 1j*mix_imag_tf
-    # print("Shape of mix stft")
-    # print(mix_stft.shape)
-    # print(embedding_labels.T.reshape(mix_stft.shape[::-1]).T[:5, :5])
-    # print(embedding_labels.reshape(mix_stft.shape[::-1]).T[:5, :5])
-    # print(embedding_labels.reshape(mix_stft.shape)[:5, :5])
 
-    embedding_clustered = embedding_labels.reshape(
-                          mix_stft.shape[::-1]).T
+    if mix_stft.shape == embedding_labels.shape:
+        embedding_clustered = embedding_labels
+    else:
+        embedding_clustered = embedding_labels.reshape(
+                              mix_stft.shape[::-1]).T
 
     sdr_t, sir_t, sar_t = 0., 0., 0.
     for i in np.arange(n_sources):
