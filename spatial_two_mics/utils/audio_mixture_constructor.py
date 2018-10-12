@@ -22,7 +22,7 @@ class AudioMixtureConstructor(object):
                  normalize_audio_by_std=True,
                  mixture_duration=2.0,
                  precision=0.01,
-                 freqs_included=7):
+                 freqs_included=5):
         """
         :param fs: sampling rate
         :param n_fft: FFT window size
@@ -98,7 +98,7 @@ class AudioMixtureConstructor(object):
         taus_samples = upsampling_rate * rounded_taus
         taus_samples = taus_samples.astype(int)
 
-        mic_signals = {'m1':[], 'm2':[]}
+        mic_signals = {'m1': [], 'm2': []}
         for src_id, source_sig in enumerate(source_signals):
             sig_len = source_sig.shape[0]
             augmented_signal = np.zeros(
