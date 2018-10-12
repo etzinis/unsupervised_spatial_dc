@@ -313,7 +313,6 @@ class RandomCombinations(ArtificialDatasetCreator):
                                              tf_mixture)
             data['soft_labeled_mask'] = duet_mask
 
-
         folder_path = os.path.join(output_dir, name)
         if not os.path.exists(folder_path):
             os.makedirs(folder_path)
