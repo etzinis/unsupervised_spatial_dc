@@ -9,7 +9,6 @@ SIR and SBR for the reconstructed signals and the true signals
 
 import numpy as np
 import librosa
-import os
 
 
 def bss_eval(sep, i, sources):
