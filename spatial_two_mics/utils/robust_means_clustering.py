@@ -34,7 +34,7 @@ class RobustKmeans(object):
         self.kmeans_obj = KMeans(n_clusters=self.N_used,
                                  random_state=7)
 
-    def fit(self, x):
+    def fit(self, x, cut_outlier_in_norm=2.):
         """!
         robust clustering for the input x
 
@@ -44,24 +44,29 @@ class RobustKmeans(object):
         labels from 0 to self.N_true - 1
         """
 
-        clustered = self.kmeans_obj.fit(x).labels_
+        if cut_outlier_in_norm is not None:
+            robust_points = x[np.where(np.linalg.norm(x, axis=1) <=
+                              cut_outlier_in_norm), :][0]
+
+            fitted_centers = self.kmeans_obj.fit(robust_points)
+            clustered = self.kmeans_obj.predict(x)
+        else:
+            fitted_centers = self.kmeans_obj.fit(x)
+            clustered = fitted_centers.labels_
+
+        cluster_coordinates = fitted_centers.cluster_centers_
+
         priors = np.bincount(clustered)
         cl_indexes = np.argsort(priors)
-        residual_clusters = cl_indexes[:-self.N_true]
+        true_clusters = cl_indexes[self.N_used - self.N_true:]
 
-        true_clusters = cl_indexes[self.N_used-self.N_true:]
-        cluster_identity = dict([(i, k)
-                                 for k, i in enumerate(true_clusters)])
-        top_prior = cluster_identity[cl_indexes[-1]]
+        fitted_centers.cluster_centers_ = cluster_coordinates[
+                                          true_clusters]
 
-        cluster_changer = dict([(i, top_prior)
-                                for i in residual_clusters])
-        cluster_changer.update(cluster_identity)
+        #         make the new prediction with the new clusters
+        robust_estimation = fitted_centers.predict(x)
 
-        robust_clustered = [cluster_changer[cl_ind]
-                            for cl_ind in clustered]
-
-        return np.array(robust_clustered)
+        return robust_estimation
 
 
 def example_of_usage():
@@ -72,6 +77,7 @@ def example_of_usage():
     data = load_iris()
     x = data.data
     y = data.target
+    x /= np.linalg.norm(x)
 
     robust_clusterer = RobustKmeans(n_true_clusters=3,
                                     n_used_clusters=3)
@@ -81,7 +87,7 @@ def example_of_usage():
     robust_clusterer = RobustKmeans(n_true_clusters=3,
                                     n_used_clusters=5)
     pred = robust_clusterer.fit(x)
-    print("Using 3 True Clusters and 3 for Prediction: {}".format(pred))
+    print("Using 3 True Clusters and 5 for Prediction: {}".format(pred))
 
 if __name__ == "__main__":
     example_of_usage()
