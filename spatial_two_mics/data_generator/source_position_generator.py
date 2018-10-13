@@ -53,15 +53,17 @@ class RandomCirclePositioner(object):
     """
 
     def __init__(self,
-                 min_angle=0.,
-                 max_angle=np.pi,
-                 radius=4.,
-                 mic_distance_percentage=0.005,
+                 min_angle=np.pi/18.,
+                 angle_sup=np.pi - np.pi/18.,
+                 angle_inf=np.pi/18.,
+                 radius=10.71,
+                 mic_distance_percentage=0.002,
                  sound_speed=343,
                  fs=16000):
         """
         :param min_angle: minimum angle in rads for the 2 sources
-        :param max_angle: maximum angle in rads for the 2 sources
+        :param angle_sup or inf: the maximum and minimum values
+        available for an angle that a source would lie on
         :param radius: Radius of the circle in **meters**
         :param mic_distance_percentage: Percentage of the radius
         corresponding to the distance between the two microphones
@@ -70,9 +72,13 @@ class RandomCirclePositioner(object):
         """
 
         self.min_angle = min_angle
-        self.max_angle = max_angle
+        self.angle_sup = angle_sup
+        self.angle_inf = angle_inf
         self.radius = radius
         self.mic_distance = self.radius * mic_distance_percentage
+        # for 16000 hz in order to get maximum +- 1 sample delays we
+        # have to sustain a distance of maximum: 2.142 cm
+        # between the mics
         self.m1 = (-self.mic_distance / 2, 0.)
         self.m2 = (self.mic_distance / 2, 0.)
         self.sound_speed = sound_speed
@@ -129,13 +135,19 @@ class RandomCirclePositioner(object):
         return distances
 
     def get_angles(self, n_source_pairs):
-        thetas = np.random.uniform(low=self.min_angle,
-                                   high=self.max_angle,
-                                   size=n_source_pairs)
-        thetas = sorted(thetas)
+        while True:
+            thetas = np.random.uniform(low=self.angle_inf,
+                                       high=self.angle_sup,
+                                       size=n_source_pairs)
+            thetas = sorted(thetas)
+            d_thetas = [th2 - th1 for (th1, th2) in
+                        zip(thetas[:-1], thetas[1:])]
 
-        d_thetas = [th2 - th1 for (th1, th2) in
-                    zip(thetas[:-1], thetas[1:])]
+            min_angle_enforced = np.where(np.abs(d_thetas) <
+                                    self.min_angle)[0].shape[0] == 0
+
+            if min_angle_enforced:
+                break
 
         return thetas, d_thetas
 
@@ -184,7 +196,7 @@ def example_of_usage():
            [-3.00000000e+00,  3.67394040e-16]])}
     """
     random_positioner = RandomCirclePositioner()
-    positions_info = random_positioner.get_sources_locations(3)
+    positions_info = random_positioner.get_sources_locations(5)
     pprint(positions_info)
 
 
