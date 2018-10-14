@@ -52,7 +52,8 @@ class RandomCombinations(ArtificialDatasetCreator):
                  create_val_set=False,
                  subset_of_speakers='train',
                  min_duration=2.0,
-                 convolution_offset=2000):
+                 convolution_offset=2000,
+                 return_phase_diff=True):
 
         super(RandomCombinations,
               self).__init__(audio_dataset_name=audio_dataset_name)
@@ -85,6 +86,7 @@ class RandomCombinations(ArtificialDatasetCreator):
 
         self.min_samples = int(min_duration * self.fs)
         self.convolution_offset = convolution_offset
+        self.return_phase_diff = return_phase_diff
 
     def get_available_speakers(self,
                                subset_of_speakers):
@@ -309,9 +311,14 @@ class RandomCombinations(ArtificialDatasetCreator):
         data['imag_tfs'] = np.imag(tf_mixture['m1_tf'])
         data['wavs'] = tf_mixture['sources_raw']
         if soft_label_estimator is not None:
-            duet_mask = soft_label_estimator.infer_mixture_labels(
-                                             tf_mixture)
+            duet_mask, raw_phase_diff = \
+                soft_label_estimator.infer_mixture_labels(tf_mixture)
+            normalized_raw_phase = np.clip(raw_phase_diff, -2., 2.)
+            normalized_raw_phase -= normalized_raw_phase.mean()
+            normalized_raw_phase /= normalized_raw_phase.std() + 10e-12
             data['soft_labeled_mask'] = duet_mask
+            data['raw_phase_diff'] = np.asarray(normalized_raw_phase,
+                                                dtype=np.float32)
 
         folder_path = os.path.join(output_dir, name)
         if not os.path.exists(folder_path):
@@ -378,7 +385,8 @@ class RandomCombinations(ArtificialDatasetCreator):
             duet_estimator = None
         else:
             duet_estimator = mask_estimator.TFMaskEstimator(
-                             inference_method='duet_Kmeans')
+                             inference_method='duet_Kmeans',
+                             return_duet_raw_features=self.return_phase_diff)
 
         mix_info_func = self.combination_process_wrapper(
                              output_dir=output_dir,
