@@ -36,14 +36,14 @@ def get_args():
                         encoder""", default=2)
     parser.add_argument("-ed", "--embedding_depth", type=int,
                         help="""The depth of the embedding""",
-                        default=10)
+                        default=16)
     parser.add_argument("-hs", "--hidden_size", type=int,
                         help="""The size of the LSTM cells """,
-                        default=10)
+                        default=1024)
     parser.add_argument("-bs", "--batch_size", type=int,
                         help="""The number of samples in each batch. 
                         Warning: Cannot be less than the number of 
-                        the validation samples""", default=64)
+                        the validation samples""", default=32)
     parser.add_argument("-name", "--experiment_name", type=str,
                         help="""The name or identifier of this 
                         experiment""",
@@ -75,9 +75,22 @@ def get_args():
                         help="""The number of training epochs in 
                         order to run an evaluation""", default=5)
     parser.add_argument("-lr", "--learning_rate", type=float,
-                        help="""Initial Learning rate""", default=1e-3)
+                        help="""Initial Learning rate""", default=1e-4)
     parser.add_argument("--bidirectional", action='store_true',
                         help="""Bidirectional or not""")
+    parser.add_argument("--early_stop_patience", type=int,
+                        help="""The number of training epochs that 
+                        the model will endure until the eval metric (
+                        e.g SDR) will not become better""",
+                        default=15)
+    parser.add_argument("--lr_patience", type=int,
+                        help="""The number of training epochs that 
+                        the model will endure until the learning 
+                        rate would be reduced""", default=7)
+    parser.add_argument("--lr_gamma_decay", type=float,
+                        help="""Multiplicative value of decay that 
+                        would be enforced in the value of the learning 
+                        rate""", default=0.2)
     parser.add_argument("--save_best", type=int,
                         help="""The number of best models dependent 
                         on the metric you want to use that are going 
