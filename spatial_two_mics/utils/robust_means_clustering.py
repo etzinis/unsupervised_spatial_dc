@@ -63,7 +63,7 @@ class RobustKmeans(object):
         fitted_centers.cluster_centers_ = cluster_coordinates[
                                           true_clusters]
 
-        #         make the new prediction with the new clusters
+        # make the new prediction with the new clusters
         robust_estimation = fitted_centers.predict(x)
 
         return robust_estimation

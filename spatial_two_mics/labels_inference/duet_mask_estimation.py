@@ -58,8 +58,8 @@ def infer_mask(mixture_info):
 
     d_feature = np.reshape(phase_dif, (np.product(phase_dif.shape), 1))
     r_kmeans = robust_kmeans.RobustKmeans(n_true_clusters=n_sources,
-                                          n_used_clusters=n_sources+1)
-    d_labels = r_kmeans.fit(d_feature)
+                                          n_used_clusters=n_sources+3)
+    d_labels = r_kmeans.fit(d_feature, cut_outlier_in_norm=2.)
     d_feature_mask = np.reshape(d_labels, phase_dif.shape)
 
     zipped_tf_labels = d_feature_mask.astype(np.uint8)
