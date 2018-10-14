@@ -48,7 +48,9 @@ class PytorchMixtureDataset(Dataset):
         self.dataset_stats_path = self.dataset_dirpath + '_stats'
         self.partition = partition
 
-        if labels_mask == 'duet' or labels_mask == 'ground_truth':
+        if (labels_mask == 'duet'
+            or labels_mask == 'ground_truth'
+            or labels_mask == 'raw_phase_diff'):
             self.selected_mask = labels_mask
         else:
             raise NotImplementedError("There is no available mask "
@@ -96,9 +98,12 @@ class PytorchMixtureDataset(Dataset):
             if self.selected_mask == 'duet':
                 mask = joblib.load(os.path.join(mix_folder,
                                                 'soft_labeled_mask'))
-            else:
+            elif self.selected_mask == 'ground_truth':
                 mask = joblib.load(os.path.join(mix_folder,
                                                 'ground_truth_mask'))
+            else:
+                mask = joblib.load(os.path.join(mix_folder,
+                                                'raw_phase_diff'))
         except:
             raise IOError("Failed to load data from path: {} "
                           "for tf label masks".format(mix_folder))
