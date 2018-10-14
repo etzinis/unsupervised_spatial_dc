@@ -33,7 +33,7 @@ def eval(data_generator,
     info = os.path.basename(data_dir)
     n_sources = int(info.split('_')[4])
 
-    eval_dic = {'sdr': 0., 'sir': 0., 'sar': 0.}
+    eval_dic = {'sdr': [], 'sir': [], 'sar': []}
 
     for batch_data in data_generator:
         abs_tfs, masks, wavs_lists, real_tfs, imag_tfs = batch_data
@@ -49,14 +49,20 @@ def eval(data_generator,
                 n_sources,
                 batch_index=b)
 
-            eval_dic['sdr'] += sdr / (1. * n_batches * abs_tfs.size(0))
-            eval_dic['sir'] += sir / (1. * n_batches * abs_tfs.size(0))
-            eval_dic['sar'] += sar / (1. * n_batches * abs_tfs.size(0))
+            eval_dic['sdr'].append(sdr / (1. * n_batches *
+                                        abs_tfs.size(0)))
+            eval_dic['sir'].append(sir / (1. * n_batches *
+                                        abs_tfs.size(0)))
+            eval_dic['sar'].append(sar / (1. * n_batches *
+                                        abs_tfs.size(0)))
 
-            print(sdr, sir, sar)
-    input("Check")
+    # return both mean and std values
+    mean_std_dic = {}
+    for k, v in eval_dic.items():
+        mean_std_dic[k+"_mean"] = np.mean(np.array(v))
+        mean_std_dic[k+"_std"] = np.std(np.array(v))
 
-    return dataset_path, eval_dic
+    return dataset_path, mean_std_dic
 
 
 def eval_wrapper():
