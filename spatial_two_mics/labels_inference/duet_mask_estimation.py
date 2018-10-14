@@ -14,7 +14,8 @@ from spatial_two_mics.utils import robust_means_clustering as  \
      robust_kmeans
 
 
-def infer_mask(mixture_info):
+def infer_mask(mixture_info,
+               return_phase_features=False):
     """
     :param mixture_info:
     mixture_info = {
@@ -66,6 +67,9 @@ def infer_mask(mixture_info):
 
     assert np.array_equal(d_feature_mask, zipped_tf_labels), \
         "Zipping the numpy matrix should not yield different labels"
+
+    if return_phase_features:
+        return zipped_tf_labels, phase_dif
 
     return zipped_tf_labels
 

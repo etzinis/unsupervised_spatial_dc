@@ -27,7 +27,8 @@ class TFMaskEstimator(object):
     microphones.
     """
     def __init__(self,
-                 inference_method=None):
+                 inference_method=None,
+                 return_duet_raw_features=False):
         if inference_method.lower() == "ground_truth":
             self.label_inference = gt_inference
         elif inference_method.lower() == "duet_kmeans":
@@ -35,6 +36,8 @@ class TFMaskEstimator(object):
         else:
             raise NotImplementedError("Inference Method: {} is not yet "
                   "implemented.".format(inference_method))
+
+        self.return_duet_raw_features = return_duet_raw_features
 
     def infer_mixture_labels(self,
                              mixture_info):
@@ -61,7 +64,11 @@ class TFMaskEstimator(object):
         to the source which the algorithm predicts that is dominating
         """
 
-        return self.label_inference.infer_mask(mixture_info)
+        if self.return_duet_raw_features:
+            return self.label_inference.infer_mask(mixture_info,
+                        return_phase_features=True)
+        else:
+            return self.label_inference.infer_mask(mixture_info)
 
 
 def example_of_usage():
