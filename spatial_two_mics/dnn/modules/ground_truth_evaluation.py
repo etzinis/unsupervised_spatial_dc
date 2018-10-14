@@ -49,12 +49,9 @@ def eval(data_generator,
                 n_sources,
                 batch_index=b)
 
-            eval_dic['sdr'].append(sdr / (1. * n_batches *
-                                        abs_tfs.size(0)))
-            eval_dic['sir'].append(sir / (1. * n_batches *
-                                        abs_tfs.size(0)))
-            eval_dic['sar'].append(sar / (1. * n_batches *
-                                        abs_tfs.size(0)))
+            eval_dic['sdr'].append(sdr)
+            eval_dic['sir'].append(sir)
+            eval_dic['sar'].append(sar)
 
     # return both mean and std values
     mean_std_dic = {}
