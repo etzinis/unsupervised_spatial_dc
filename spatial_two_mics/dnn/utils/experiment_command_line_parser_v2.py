@@ -48,15 +48,22 @@ def get_args():
                         help="""The name or identifier of this 
                         experiment""",
                         default='A sample experiment'),
-    parser.add_argument("-l", "--labels_mask", type=str,
+    parser.add_argument("-train_l", "--training_labels", type=str,
                         help="""The type of masks that you want to 
-                        use -- 'ground_truth' or 'duet'""",
+                        use for training as the ideal affinities""",
+                        default='duet', choices=['duet',
+                                                 'raw_phase_diff',
+                                                 'ground_truth'])
+    parser.add_argument("-eval_l", "--eval_labels", type=str,
+                        help="""The type of masks that you want to 
+                            use for evaluation""",
                         default='duet', choices=['duet',
                                                  'ground_truth'])
+
     parser.add_argument("-cad", "--cuda_available_devices", type=int,
                         nargs="+",
                         help="""A list of Cuda IDs that would be 
-                        available for runnign this experiment""",
+                        available for running this experiment""",
                         default=[0])
     parser.add_argument("--num_workers", type=int,
                         help="""The number of cpu workers for 
