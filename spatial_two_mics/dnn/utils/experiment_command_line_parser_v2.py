@@ -54,12 +54,6 @@ def get_args():
                         default='duet', choices=['duet',
                                                  'raw_phase_diff',
                                                  'ground_truth'])
-    parser.add_argument("-eval_l", "--eval_labels", type=str,
-                        help="""The type of masks that you want to 
-                            use for evaluation""",
-                        default='duet', choices=['duet',
-                                                 'ground_truth'])
-
     parser.add_argument("-cad", "--cuda_available_devices", type=int,
                         nargs="+",
                         help="""A list of Cuda IDs that would be 

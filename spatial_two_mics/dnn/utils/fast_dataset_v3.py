@@ -48,13 +48,14 @@ class PytorchMixtureDataset(Dataset):
         self.dataset_stats_path = self.dataset_dirpath + '_stats'
         self.partition = partition
 
-        if (labels_mask == 'duet'
-            or labels_mask == 'ground_truth'
-            or labels_mask == 'raw_phase_diff'):
-            self.selected_mask = labels_mask
-        else:
-            raise NotImplementedError("There is no available mask "
-                                      "called: {}".format(labels_mask))
+        if self.partition == 'train':
+            if (labels_mask == 'duet'
+                or labels_mask == 'ground_truth'
+                or labels_mask == 'raw_phase_diff'):
+                self.selected_mask = labels_mask
+            else:
+                raise NotImplementedError("There is no available mask "
+                      "called: {}".format(labels_mask))
 
         if not os.path.isdir(self.dataset_dirpath):
             raise IOError("Dataset folder {} not found!".format(
@@ -93,38 +94,39 @@ class PytorchMixtureDataset(Dataset):
             raise IOError("Failed to load data from path: {} "
                           "for absolute spectra.".format(mix_folder))
 
+        if self.partition == 'val' or self.partition == 'test':
+            try:
+                real_p = os.path.join(mix_folder, 'real_tfs')
+                imag_p = os.path.join(mix_folder, 'imag_tfs')
+                wavs_p = os.path.join(mix_folder, 'wavs')
+                real_tfs = joblib.load(real_p)
+                imag_tfs = joblib.load(imag_p)
+                wavs_list = joblib.load(wavs_p)
+                wavs_list = np.array(wavs_list)
+            except:
+                raise IOError("Failed to load data from path: {} "
+                              "for real, imag tf of the mixture and "
+                              "wavs".format(mix_folder))
 
-        try:
-            if self.selected_mask == 'duet':
-                mask = joblib.load(os.path.join(mix_folder,
-                                                'soft_labeled_mask'))
-            elif self.selected_mask == 'ground_truth':
-                mask = joblib.load(os.path.join(mix_folder,
-                                                'ground_truth_mask'))
-            else:
-                mask = joblib.load(os.path.join(mix_folder,
-                                                'raw_phase_diff'))
-        except:
-            raise IOError("Failed to load data from path: {} "
-                          "for tf label masks".format(mix_folder))
+            return abs_tfs, wavs_list, real_tfs, imag_tfs
 
         if self.partition == 'train':
+            try:
+                if self.selected_mask == 'duet':
+                    mask = joblib.load(os.path.join(mix_folder,
+                                       'soft_labeled_mask'))
+                elif self.selected_mask == 'ground_truth':
+                    mask = joblib.load(os.path.join(mix_folder,
+                                       'ground_truth_mask'))
+                else:
+                    mask = joblib.load(os.path.join(mix_folder,
+                                       'raw_phase_diff'))
+            except:
+                raise IOError("Failed to load data from path: {} "
+                              "for tf label masks".format(mix_folder))
             return abs_tfs, mask
 
-        try:
-            real_p = os.path.join(mix_folder, 'real_tfs')
-            imag_p = os.path.join(mix_folder, 'imag_tfs')
-            wavs_p= os.path.join(mix_folder, 'wavs')
-            real_tfs = joblib.load(real_p)
-            imag_tfs = joblib.load(imag_p)
-            wavs_list = joblib.load(wavs_p)
-            wavs_list = np.array(wavs_list)
-        except:
-            raise IOError("Failed to load data from path: {} "
-                          "for real, imag tf of the mixture and "
-                          "wavs".format(mix_folder))
-
-        return abs_tfs, mask, wavs_list, real_tfs, imag_tfs
+        return None
 
     def store_directly_abs_spectra(self):
         for mix_folder in self.mixture_folders:
