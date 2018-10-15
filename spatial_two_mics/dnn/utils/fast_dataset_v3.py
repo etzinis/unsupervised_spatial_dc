@@ -71,6 +71,9 @@ class PytorchMixtureDataset(Dataset):
 
         self.n_samples = len(self.mixture_folders)
 
+        self.n_sources = int(os.path.basename(
+                             dataset_dir).split("_")[4])
+
         # preprocess -- store all absolute spectra values for faster
         # loading during run time
         self.store_directly_abs_spectra()
@@ -184,7 +187,8 @@ def get_data_generator(dataset_dir,
                        get_top=None,
                        batch_size=1,
                        return_n_batches=True,
-                       labels_mask='duet'):
+                       labels_mask='duet',
+                       return_n_sources=False):
     data = PytorchMixtureDataset(dataset_dir,
                                  partition=partition,
                                  get_top=get_top,
@@ -206,5 +210,8 @@ def get_data_generator(dataset_dir,
     if return_n_batches:
         n_batches = int(len(data) / batch_size)
         results.append(n_batches)
+
+    if return_n_sources:
+        results.append(data.n_sources)
 
     return results
