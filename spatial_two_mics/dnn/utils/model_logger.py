@@ -24,7 +24,7 @@ def save(model,
          epoch,
          performance_dic,
          dataset_id,
-         max_models_per_dataset=10):
+         max_models_per_dataset=20):
     state = {
         'epoch': epoch,
         'val_performance': performance_dic,
@@ -33,6 +33,8 @@ def save(model,
         'args': args
     }
     sdr_str = str(round(performance_dic['sdr'], 3))
+    sar_str = str(round(performance_dic['sar'], 3))
+    sir_str = str(round(performance_dic['sir'], 3))
     folder_name = os.path.join(MODELS_DIR, dataset_id)
     if not os.path.exists(folder_name):
         os.makedirs(folder_name)
@@ -54,7 +56,10 @@ def save(model,
                 print("Error in removing {} ...".format(path))
 
     ts = datetime.datetime.now().strftime("%Y-%m-%d-%H:%M:%s")
-    filename = "SDR_{}_{}.pt".format(sdr_str, ts)
+    filename = "SDR_{}_SIR_{}_SAR_{}_{}.pt".format(sdr_str,
+                                                   sir_str,
+                                                   sar_str,
+                                                   ts)
     file_path = os.path.join(folder_name, filename)
     torch.save(state, file_path)
 
