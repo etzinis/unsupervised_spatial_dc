@@ -70,6 +70,8 @@ def get_args():
                         order to run an evaluation""", default=5)
     parser.add_argument("-lr", "--learning_rate", type=float,
                         help="""Initial Learning rate""", default=1e-4)
+    parser.add_argument("-dr", "--dropout", type=float,
+                        help="""Dropout Ratio""", default=0.)
     parser.add_argument("--bidirectional", action='store_true',
                         help="""Bidirectional or not""")
     parser.add_argument("--early_stop_patience", type=int,

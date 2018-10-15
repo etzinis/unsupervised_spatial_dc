@@ -15,6 +15,7 @@ class BLSTMEncoder(nn.Module):
                  n_features=257,
                  num_layers=1,
                  hidden_size=None,
+                 dropout=0.0,
                  embedding_depth=None,
                  bidirectional=True):
         super(BLSTMEncoder, self).__init__()
@@ -39,6 +40,7 @@ class BLSTMEncoder(nn.Module):
                            num_layers=num_layers,
                            hidden_size=self.hidden_size,
                            bidirectional=bidirectional,
+                           dropout=dropout,
                            batch_first=True)
         self.affine = nn.Linear(self.n_directions*self.hidden_size,
                                 self.emb_dim)

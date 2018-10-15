@@ -41,7 +41,7 @@ def values_update(list_of_pairs,
     return history_dic
 
 
-def update_best_performance(performance,
+def update_best_performance(performance_dic,
                             epoch,
                             history_dic,
                             buffer_size=0):
@@ -52,11 +52,12 @@ def update_best_performance(performance,
     the best performance so far
     """
     if 'best_performances' not in history_dic:
-        history_dic['best_performances'] = [(performance, epoch)]
+        history_dic['best_performances'] = [(performance_dic, epoch)]
     else:
-        history_dic['best_performances'].append((performance, epoch))
+        history_dic['best_performances'].append((performance_dic,
+                                                 epoch))
         history_dic['best_performances'] = \
             sorted(history_dic['best_performances'],
-                   key=lambda x: x[0])[::-1][:buffer_size]
+                   key=lambda x: x[0]['sdr'])[::-1][:buffer_size]
 
     return history_dic
