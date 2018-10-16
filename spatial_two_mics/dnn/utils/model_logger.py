@@ -10,12 +10,14 @@ import sys
 import torch
 import datetime
 import glob2
+import torch.nn as nn
 
 root_dir = os.path.join(
     os.path.dirname(os.path.realpath(__file__)),
     '../../../')
 sys.path.insert(0, root_dir)
 from spatial_two_mics.config import MODELS_DIR
+import spatial_two_mics.dnn.models.simple_LSTM_encoder as LSTM_builder
 
 
 def save(model,
@@ -24,18 +26,23 @@ def save(model,
          epoch,
          performance_dic,
          dataset_id,
+         mean_tr,
+         std_tr,
          max_models_per_dataset=20):
     state = {
         'epoch': epoch,
         'val_performance': performance_dic,
         'model_state': model.state_dict(),
         'optimizer_state': optimizer.state_dict(),
-        'args': args
+        'args': args,
+        'mean_tr': mean_tr,
+        'std_tr': std_tr
     }
     sdr_str = str(round(performance_dic['sdr'], 3))
     sar_str = str(round(performance_dic['sar'], 3))
     sir_str = str(round(performance_dic['sir'], 3))
     folder_name = os.path.join(MODELS_DIR, dataset_id)
+
     if not os.path.exists(folder_name):
         os.makedirs(folder_name)
 
@@ -82,5 +89,35 @@ def load(model,
     epoch = loaded_state['epoch']
     val_performance = loaded_state['val_performance']
     args = loaded_state['args']
+    mean_tr = loaded_state['mean_tr']
+    std_tr = loaded_state['std_tr']
 
-    return model, optimizer, epoch, val_performance, args
+    return (model, optimizer, epoch, val_performance,
+            args, mean_tr, std_tr)
+
+
+def load_and_create_the_model(model_path):
+
+    loaded_state = torch.load(model_path)
+    epoch = loaded_state['epoch']
+    val_performance = loaded_state['val_performance']
+    args = loaded_state['args']
+    mean_tr = loaded_state['mean_tr']
+    std_tr = loaded_state['std_tr']
+
+    model = LSTM_builder.BLSTMEncoder(num_layers=args.n_layers,
+                                      hidden_size=args.hidden_size,
+                                      embedding_depth=args.embedding_depth,
+                                      bidirectional=args.bidirectional,
+                                      dropout=args.dropout)
+    model = nn.DataParallel(model).cuda()
+
+    optimizer = torch.optim.Adam(model.parameters(),
+                                 lr=args.learning_rate,
+                                 betas=(0.9, 0.999))
+
+    model.load_state_dict(loaded_state['model_state'])
+    optimizer.load_state_dict(loaded_state['optimizer_state'])
+
+    return (model, optimizer, epoch, val_performance,
+            args, mean_tr, std_tr)

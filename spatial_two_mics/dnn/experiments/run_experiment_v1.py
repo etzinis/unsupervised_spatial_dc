@@ -223,22 +223,13 @@ def run_LSTM_experiment(args):
                                   args,
                                   epoch,
                                   epoch_performance_dic,
-                                  dataset_id)
-
-                # model, optimizer, epoch, val_performance, new_args = \
-                # model_logger.load(model, optimizer, dataset_id,
-                #                   filename=None)
+                                  dataset_id,
+                                  mean_tr,
+                                  std_tr)
 
 
         pprint(history['loss'][-1])
-        pprint(history['sdr'][-1])
-        pprint(history['sir'][-1])
-        pprint(history['sar'][-1])
         pprint(history['best_performances'])
-        # print(
-        #     "BEST SDR: {}, SIR: {}, SAR {}".format(max(history['sdr']),
-        #                                            max(history['sir']),
-        #                                            max(history['sar'])))
 
 
 if __name__ == "__main__":
