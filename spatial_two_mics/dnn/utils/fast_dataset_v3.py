@@ -53,6 +53,8 @@ class PytorchMixtureDataset(Dataset):
             or labels_mask == 'ground_truth'
             or labels_mask == 'raw_phase_diff'):
             self.selected_mask = labels_mask
+        elif labels_mask is None:
+            pass 
         else:
             raise NotImplementedError("There is no available mask "
                   "called: {}".format(labels_mask))
