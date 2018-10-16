@@ -26,6 +26,7 @@ import spatial_two_mics.dnn.utils.fast_dataset_v3 as data_loader
 import spatial_two_mics.dnn.evaluation.naive_evaluation_numpy as np_eval
 import spatial_two_mics.dnn.utils.model_logger as model_logger
 from spatial_two_mics.config import RESULTS_DIR
+from spatial_two_mics.config import RESULTS_RAW_PHASE_DIR
 import spatial_two_mics.dnn.evaluation.naive_evaluation_numpy as \
     numpy_eval
 from sklearn.cluster import KMeans
@@ -33,8 +34,6 @@ from sklearn.cluster import KMeans
 
 def eval(dataset_gen,
          model_path,
-         dataset_dir,
-         partition,
          n_sources,
          n_batches,
          n_jobs):
@@ -43,7 +42,7 @@ def eval(dataset_gen,
 
     eval_dic = {'sdr': [], 'sir': [], 'sar': []}
 
-    model, optimizer, _, _, args, mean_tr, std_tr = \
+    model, optimizer, _, _, args, mean_tr, std_tr, training_labels = \
         model_logger.load_and_create_the_model(model_path)
 
     k_means_obj = KMeans(n_clusters=n_sources, n_jobs=n_jobs)
@@ -95,6 +94,7 @@ def eval(dataset_gen,
     mean_std_dic['embedding_depth'] = args.embedding_depth
     mean_std_dic['dropout'] = str(args.dropout)
     mean_std_dic['lr'] = args.learning_rate
+    mean_std_dic['training_labels'] = training_labels
 
     return model_name, mean_std_dic
 
@@ -150,8 +150,6 @@ def evaluate_models(pretrained_models,
 
             model_name, res = eval(val_generator,
                                    model_path,
-                                   dataset_dir,
-                                   partition,
                                    n_val_sources,
                                    n_val_batches,
                                    n_jobs)

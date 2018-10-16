@@ -17,6 +17,7 @@ root_dir = os.path.join(
     '../../../')
 sys.path.insert(0, root_dir)
 from spatial_two_mics.config import MODELS_DIR
+from spatial_two_mics.config import MODELS_RAW_PHASE_DIR
 import spatial_two_mics.dnn.models.simple_LSTM_encoder as LSTM_builder
 
 
@@ -28,7 +29,8 @@ def save(model,
          dataset_id,
          mean_tr,
          std_tr,
-         max_models_per_dataset=20):
+         max_models_per_dataset=30,
+         training_labels=''):
     state = {
         'epoch': epoch,
         'val_performance': performance_dic,
@@ -36,12 +38,17 @@ def save(model,
         'optimizer_state': optimizer.state_dict(),
         'args': args,
         'mean_tr': mean_tr,
-        'std_tr': std_tr
+        'std_tr': std_tr,
+        'training_labels': training_labels
     }
     sdr_str = str(round(performance_dic['sdr'], 3))
     sar_str = str(round(performance_dic['sar'], 3))
     sir_str = str(round(performance_dic['sir'], 3))
-    folder_name = os.path.join(MODELS_DIR, dataset_id)
+
+    if training_labels == 'raw_phase_diff':
+        folder_name = os.path.join(MODELS_RAW_PHASE_DIR, dataset_id)
+    else:
+        folder_name = os.path.join(MODELS_DIR, dataset_id)
 
     if not os.path.exists(folder_name):
         os.makedirs(folder_name)
@@ -71,29 +78,29 @@ def save(model,
     torch.save(state, file_path)
 
 
-def load(model,
-         optimizer,
-         dataset_id,
-         filename=None):
-
-    folder_name = os.path.join(MODELS_DIR, dataset_id)
-    if filename is None:
-        available_models = glob2.glob(folder_name + '/*.pt')
-        file_path = os.path.join(folder_name, available_models[0])
-    else:
-        file_path = os.path.join(folder_name, filename)
-
-    loaded_state = torch.load(file_path)
-    model.load_state_dict(loaded_state['model_state'])
-    optimizer.load_state_dict(loaded_state['optimizer_state'])
-    epoch = loaded_state['epoch']
-    val_performance = loaded_state['val_performance']
-    args = loaded_state['args']
-    mean_tr = loaded_state['mean_tr']
-    std_tr = loaded_state['std_tr']
-
-    return (model, optimizer, epoch, val_performance,
-            args, mean_tr, std_tr)
+# def load(model,
+#          optimizer,
+#          dataset_id,
+#          filename=None):
+#
+#     folder_name = os.path.join(MODELS_DIR, dataset_id)
+#     if filename is None:
+#         available_models = glob2.glob(folder_name + '/*.pt')
+#         file_path = os.path.join(folder_name, available_models[0])
+#     else:
+#         file_path = os.path.join(folder_name, filename)
+#
+#     loaded_state = torch.load(file_path)
+#     model.load_state_dict(loaded_state['model_state'])
+#     optimizer.load_state_dict(loaded_state['optimizer_state'])
+#     epoch = loaded_state['epoch']
+#     val_performance = loaded_state['val_performance']
+#     args = loaded_state['args']
+#     mean_tr = loaded_state['mean_tr']
+#     std_tr = loaded_state['std_tr']
+#
+#     return (model, optimizer, epoch, val_performance,
+#             args, mean_tr, std_tr)
 
 
 def load_and_create_the_model(model_path):
@@ -104,6 +111,7 @@ def load_and_create_the_model(model_path):
     args = loaded_state['args']
     mean_tr = loaded_state['mean_tr']
     std_tr = loaded_state['std_tr']
+    training_labels = loaded_state['training_labels']
 
     model = LSTM_builder.BLSTMEncoder(num_layers=args.n_layers,
                                       hidden_size=args.hidden_size,
@@ -120,4 +128,4 @@ def load_and_create_the_model(model_path):
     optimizer.load_state_dict(loaded_state['optimizer_state'])
 
     return (model, optimizer, epoch, val_performance,
-            args, mean_tr, std_tr)
+            args, mean_tr, std_tr, training_labels)

@@ -46,7 +46,8 @@ def train(model,
           epoch,
           history,
           n_batches,
-          n_sources):
+          n_sources,
+          training_labels=''):
     model.train()
     bar = ChargingBar("Training for epoch: {}...".format(epoch),
                       max=n_batches)
@@ -62,12 +63,15 @@ def train(model,
         input_tfs -= mean_tr
         input_tfs /= std_tr
 
-        # index_ys = index_ys.permute(0, 2, 1).contiguous()
-        one_hot_ys = converters.one_hot_3Dmasks(index_ys,
-                                                n_sources)
-        flatened_ys = one_hot_ys.view(one_hot_ys.size(0),
-                                      -1,
-                                      one_hot_ys.size(-1)).cuda()
+        if training_labels == 'raw_phase_diff':
+            flatened_ys = index_ys.view(index_ys.size(0), -1, 1)
+        else:
+            # index_ys = index_ys.permute(0, 2, 1).contiguous()
+            one_hot_ys = converters.one_hot_3Dmasks(index_ys,
+                                                    n_sources)
+            flatened_ys = one_hot_ys.view(one_hot_ys.size(0),
+                                          -1,
+                                          one_hot_ys.size(-1)).cuda()
 
         optimizer.zero_grad()
         vs = model(input_tfs)
@@ -184,7 +188,8 @@ def run_LSTM_experiment(args):
     for epoch in np.arange(args.epochs):
 
         train(model, training_generator, optimizer, mean_tr,
-              std_tr, epoch, history, n_tr_batches, n_tr_sources)
+              std_tr, epoch, history, n_tr_batches, n_tr_sources,
+              training_labels=args.training_labels)
 
         update_history.values_update([('loss', None)],
                                      history,
@@ -225,7 +230,8 @@ def run_LSTM_experiment(args):
                                   epoch_performance_dic,
                                   dataset_id,
                                   mean_tr,
-                                  std_tr)
+                                  std_tr,
+                                  training_labels=args.training_labels)
 
 
         pprint(history['loss'][-1])
