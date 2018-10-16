@@ -34,6 +34,7 @@ class PytorchMixtureDataset(Dataset):
                  partition='train',
                  get_top=None,
                  labels_mask='duet',
+                 only_mask_evaluation=False,
                  **kwargs):
         """!
         Input dataset dir should have the following structure:
@@ -48,14 +49,13 @@ class PytorchMixtureDataset(Dataset):
         self.dataset_stats_path = self.dataset_dirpath + '_stats'
         self.partition = partition
 
-        if self.partition == 'train':
-            if (labels_mask == 'duet'
-                or labels_mask == 'ground_truth'
-                or labels_mask == 'raw_phase_diff'):
-                self.selected_mask = labels_mask
-            else:
-                raise NotImplementedError("There is no available mask "
-                      "called: {}".format(labels_mask))
+        if (labels_mask == 'duet'
+            or labels_mask == 'ground_truth'
+            or labels_mask == 'raw_phase_diff'):
+            self.selected_mask = labels_mask
+        else:
+            raise NotImplementedError("There is no available mask "
+                  "called: {}".format(labels_mask))
 
         if not os.path.isdir(self.dataset_dirpath):
             raise IOError("Dataset folder {} not found!".format(
@@ -70,6 +70,7 @@ class PytorchMixtureDataset(Dataset):
             self.mixture_folders = self.mixture_folders[:get_top]
 
         self.n_samples = len(self.mixture_folders)
+        self.only_mask_evaluation = only_mask_evaluation
 
         self.n_sources = int(os.path.basename(
                              dataset_dir).split("_")[4])
@@ -111,7 +112,22 @@ class PytorchMixtureDataset(Dataset):
                               "for real, imag tf of the mixture and "
                               "wavs".format(mix_folder))
 
-            return abs_tfs, wavs_list, real_tfs, imag_tfs
+            if not self.only_mask_evaluation:
+                return abs_tfs, wavs_list, real_tfs, imag_tfs
+
+            try:
+                if self.selected_mask == 'duet':
+                    mask = joblib.load(os.path.join(mix_folder,
+                                                    'soft_labeled_mask'))
+                elif self.selected_mask == 'ground_truth':
+                    mask = joblib.load(os.path.join(mix_folder,
+                                                    'ground_truth_mask'))
+            except Exception as e:
+                print(e)
+                raise IOError("Failed to load data from path: {} "
+                              "for tf label masks".format(mix_folder))
+
+            return abs_tfs, mask, wavs_list, real_tfs, imag_tfs
 
         if self.partition == 'train':
             try:
@@ -124,7 +140,8 @@ class PytorchMixtureDataset(Dataset):
                 else:
                     mask = joblib.load(os.path.join(mix_folder,
                                        'raw_phase_diff'))
-            except:
+            except Exception as e:
+                print(e)
                 raise IOError("Failed to load data from path: {} "
                               "for tf label masks".format(mix_folder))
             return abs_tfs, mask
@@ -188,11 +205,13 @@ def get_data_generator(dataset_dir,
                        batch_size=1,
                        return_n_batches=True,
                        labels_mask='duet',
-                       return_n_sources=False):
+                       return_n_sources=False,
+                       only_mask_evaluation=False):
     data = PytorchMixtureDataset(dataset_dir,
                                  partition=partition,
                                  get_top=get_top,
-                                 labels_mask=labels_mask)
+                                 labels_mask=labels_mask,
+                                 only_mask_evaluation=only_mask_evaluation)
     generator_params = {'batch_size': batch_size,
                         'shuffle': True,
                         'num_workers': num_workers,

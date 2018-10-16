@@ -26,7 +26,6 @@ import spatial_two_mics.dnn.evaluation.naive_evaluation_numpy as np_eval
 
 
 def eval(data_generator,
-         n_batches,
          dataset_path):
 
     data_dir = os.path.dirname(dataset_path)
@@ -72,7 +71,6 @@ def evaluate_labels(dataset_folders,
                     n_jobs=1,
                     get_top=None):
 
-    # n_workers = min(len(dataset_folders), n_jobs)
     n_workers = n_jobs
     dirs_and_parts = [(os.path.dirname(f), os.path.basename(f))
                       for f in dataset_folders]
@@ -85,22 +83,17 @@ def evaluate_labels(dataset_folders,
     print("Initializing the data loaders for all the datasets...")
     datasets_loaders = [data_loader.get_data_generator(
                         dataset_dir, partition=partition,
-                        get_top=get_top, num_workers=1, return_stats=False,
-                        labels_mask=eval_labels, return_n_batches=True)
+                        get_top=get_top, num_workers=1,
+                        return_stats=False, labels_mask=eval_labels,
+                        return_n_batches=True,
+                        only_mask_evaluation=True)
                         for (dataset_dir, partition) in dirs_and_parts]
 
     data_info = [list(itertools.chain.from_iterable(info_lists))
                  for info_lists in zip(datasets_loaders, dirs_and_parts)]
 
-    eval_results = [eval(data_loader,
-                         n_batches,
-                         os.path.join(data_dir, partition))
-                    for (data_loader, n_batches, data_dir, partition)
-                    in data_info]
-
     eval_results = Parallel(n_jobs=n_jobs)(
                    [delayed(eval)(data_loader,
-                                  n_batches,
                                   os.path.join(data_dir, partition))
                    for (data_loader, n_batches, data_dir, partition)
                    in tqdm(data_info)])
