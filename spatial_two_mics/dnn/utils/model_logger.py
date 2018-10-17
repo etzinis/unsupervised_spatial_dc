@@ -18,6 +18,7 @@ root_dir = os.path.join(
 sys.path.insert(0, root_dir)
 from spatial_two_mics.config import MODELS_DIR
 from spatial_two_mics.config import MODELS_RAW_PHASE_DIR
+from spatial_two_mics.config import MODELS_GROUND_TRUTH
 import spatial_two_mics.dnn.models.simple_LSTM_encoder as LSTM_builder
 
 
@@ -47,8 +48,11 @@ def save(model,
 
     if training_labels == 'raw_phase_diff':
         folder_name = os.path.join(MODELS_RAW_PHASE_DIR, dataset_id)
+    elif training_labels == 'ground_truth':
+        folder_name = os.path.join(MODELS_GROUND_TRUTH, dataset_id)
     else:
         folder_name = os.path.join(MODELS_DIR, dataset_id)
+
 
     if not os.path.exists(folder_name):
         os.makedirs(folder_name)

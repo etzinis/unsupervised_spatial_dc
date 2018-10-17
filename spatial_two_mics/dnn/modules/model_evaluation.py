@@ -26,7 +26,6 @@ import spatial_two_mics.dnn.utils.fast_dataset_v3 as data_loader
 import spatial_two_mics.dnn.evaluation.naive_evaluation_numpy as np_eval
 import spatial_two_mics.dnn.utils.model_logger as model_logger
 from spatial_two_mics.config import RESULTS_DIR
-from spatial_two_mics.config import RESULTS_RAW_PHASE_DIR
 import spatial_two_mics.dnn.evaluation.naive_evaluation_numpy as \
     numpy_eval
 from sklearn.cluster import KMeans
