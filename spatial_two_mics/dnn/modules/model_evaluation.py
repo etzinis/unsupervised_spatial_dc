@@ -26,9 +26,9 @@ import spatial_two_mics.dnn.utils.fast_dataset_v3 as data_loader
 import spatial_two_mics.dnn.evaluation.naive_evaluation_numpy as np_eval
 import spatial_two_mics.dnn.utils.model_logger as model_logger
 from spatial_two_mics.config import RESULTS_DIR
-import spatial_two_mics.dnn.evaluation.naive_evaluation_numpy as \
-    numpy_eval
 from sklearn.cluster import KMeans
+from spatial_two_mics.utils import robust_means_clustering as  \
+     robust_kmeans
 
 
 def eval(dataset_gen,
@@ -65,8 +65,12 @@ def eval(dataset_gen,
             for b in np.arange(vs.size(0)):
                 embedding_features = vs[b, :, :].data.cpu().numpy()
 
+                z_embds = (embedding_features -
+                           np.mean(embedding_features, axis=0)) / (
+                           np.std(embedding_features, axis=0) + 10e-8)
+
                 embedding_labels = np.array(k_means_obj.fit_predict(
-                    embedding_features))
+                    z_embds))
 
                 sdr, sir, sar = np_eval.naive_cpu_bss_eval(
                     embedding_labels,
@@ -101,14 +105,16 @@ def eval(dataset_gen,
 def evaluate_models(pretrained_models,
                     dataset_folder,
                     n_jobs=1,
-                    get_top=None):
+                    get_top=None,
+                    batch_size=32):
+
     visible_cuda_ids = ','.join(map(str, args.cuda_available_devices))
     os.environ["CUDA_VISIBLE_DEVICES"] = visible_cuda_ids
 
     (dataset_dir, partition) = (os.path.dirname(dataset_folder),
                                 os.path.basename(dataset_folder))
 
-    default_bs = 4
+    default_bs = batch_size
     if get_top is None:
         loading_bs = default_bs
     else:
@@ -126,7 +132,7 @@ def evaluate_models(pretrained_models,
                                        batch_size=loading_bs)
 
     eval_results = {}
-    for model_path in pretrained_models:
+    for model_path in sorted(pretrained_models):
 
         try:
             test_on = os.path.basename(dataset_dir) + '_' + partition
@@ -139,7 +145,7 @@ def evaluate_models(pretrained_models,
             # if the df already exists then do not make the evaluation
             df_path = os.path.join(folder_name,
                                    'train_on_' + train_on + '.csv')
-            if os.path.lexists(df_path):
+            if os.path.exists(df_path):
                 df = pd.read_csv(df_path)
                 df.set_index("Unnamed: 0", drop=True, inplace=True)
                 eval_results = df.to_dict(orient='index')
@@ -152,6 +158,9 @@ def evaluate_models(pretrained_models,
                                    n_val_sources,
                                    n_val_batches,
                                    n_jobs)
+
+            print(model_name)
+            print(res)
 
             eval_results[model_name] = res
 
@@ -180,6 +189,9 @@ def get_args():
     parser.add_argument("--n_jobs", type=int,
                         help="Number of parallel spawning jobs",
                         default=1)
+    parser.add_argument("-bs", "--batch_size", type=int,
+                        help="Batch size to be evaluated",
+                        default=32)
     parser.add_argument("--n_eval", type=int,
                         help="""Reduce the number of evaluation 
                             samples to this number.""", default=None)
@@ -196,7 +208,8 @@ if __name__ == "__main__":
     df_results = evaluate_models(args.pretrained_models,
                                  args.dataset_to_test,
                                  n_jobs=args.n_jobs,
-                                 get_top=args.n_eval)
+                                 get_top=args.n_eval,
+                                 batch_size=args.batch_size)
 
     pd.set_option('display.expand_frame_repr', False)
     print(df_results.sort_values(['sdr_mean'], ascending=False))
