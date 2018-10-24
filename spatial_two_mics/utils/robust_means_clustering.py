@@ -68,6 +68,17 @@ class RobustKmeans(object):
 
         return robust_estimation
 
+    def fit_predict(self, x, cut_outlier_in_norm=2.):
+        """!
+        robust clustering for the input x
+
+        :param x: nd array with shape: (n_samples, n_features)
+
+        :return cluster_labels: 1d array with the corresponding
+        labels from 0 to self.N_true - 1
+        """
+        return self.fit(x, cut_outlier_in_norm=cut_outlier_in_norm)
+
 
 def example_of_usage():
     """!
