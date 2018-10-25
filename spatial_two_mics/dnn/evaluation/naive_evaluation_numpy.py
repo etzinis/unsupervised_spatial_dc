@@ -77,3 +77,23 @@ def naive_cpu_bss_eval(embedding_labels,
         # librosa.output.write_wav(wav_p, reconstructed, 16000)
 
     return sdr_t/n_sources, sir_t/n_sources, sar_t/n_sources
+
+
+def mixture_bss_eval(mix_real_tf,
+                     mix_imag_tf,
+                     sources_raw,
+                     n_sources):
+
+    mix_stft = mix_real_tf + 1j*mix_imag_tf
+
+    reconstructed = librosa.core.istft(mix_stft,
+                                       hop_length=128,
+                                       win_length=512)
+    bss_results = [bss_eval(reconstructed, j, sources_raw)
+                   for j in np.arange(n_sources)]
+
+    (sdrs, sirs, sars) = (np.array([x[0] for x in bss_results]),
+                          np.array([x[1] for x in bss_results]),
+                          np.array([x[2] for x in bss_results]))
+
+    return np.mean(sdrs), np.mean(sirs), np.mean(sars)
