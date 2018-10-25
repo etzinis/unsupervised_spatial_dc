@@ -1,0 +1,125 @@
+"""!
+@brief For a specific dataset just find all the groundtruth
+evaluation when applying either a duet or a ground truth labeled mask
+for source separation
+
+@author Efthymios Tzinis {etzinis2@illinois.edu}
+@copyright University of illinois at Urbana Champaign
+"""
+
+import argparse
+import os
+import sys
+import numpy as np
+from pprint import pprint
+from joblib import Parallel, delayed
+from tqdm import tqdm
+import itertools
+import pandas as pd
+
+root_dir = os.path.join(
+    os.path.dirname(os.path.realpath(__file__)),
+    '../../../')
+sys.path.insert(0, root_dir)
+import spatial_two_mics.dnn.utils.fast_dataset_v3 as data_loader
+import spatial_two_mics.dnn.evaluation.naive_evaluation_numpy as np_eval
+
+
+def eval(data_generator,
+         dataset_path):
+
+    data_dir = os.path.dirname(dataset_path)
+    info = os.path.basename(data_dir)
+    n_sources = int(info.split('_')[4])
+
+    eval_dic = {'sdr': [], 'sir': [], 'sar': []}
+
+    for batch_data in data_generator:
+        abs_tfs, masks, wavs_lists, real_tfs, imag_tfs = batch_data
+
+        for b in np.arange(abs_tfs.size(0)):
+
+            sdr, sir, sar = np_eval.mixture_bss_eval(
+                real_tfs[b].data.numpy(),
+                imag_tfs[b].data.numpy(),
+                wavs_lists[b].data.numpy(),
+                n_sources)
+
+            eval_dic['sdr'].append(sdr)
+            eval_dic['sir'].append(sir)
+            eval_dic['sar'].append(sar)
+
+    # return both mean and std values
+    mean_std_dic = {}
+    for k, v in eval_dic.items():
+        # mean_std_dic[k + "_max"] = np.max(np.array(v))
+        # mean_std_dic[k + "_min"] = np.min(np.array(v))
+        mean_std_dic[k+"_mean"] = np.mean(np.array(v))
+        mean_std_dic[k+"_std"] = np.std(np.array(v))
+        # mean_std_dic[k + "_50"] = np.quantile(np.array(v), 0.50)
+        # mean_std_dic[k + "_25"] = np.quantile(np.array(v), 0.25)
+        # mean_std_dic[k + "_75"] = np.quantile(np.array(v), 0.75)
+
+    return dataset_path, mean_std_dic
+
+def evaluate_bss_metrics(dataset_folders,
+                         n_jobs=1,
+                         get_top=None):
+
+    dirs_and_parts = [(os.path.dirname(f), os.path.basename(f))
+                      for f in dataset_folders]
+
+    assert all([partition == 'test' or partition == 'val'
+                for (_, partition) in dirs_and_parts]), '' \
+           'All selected dataset folder to be evaluated have either ' \
+           'to be test or val folder from a certain dataset!'
+
+    print("Initializing the data loaders for all the datasets...")
+    datasets_loaders = [data_loader.get_data_generator(
+                        dataset_dir, partition=partition,
+                        get_top=get_top, num_workers=1,
+                        return_stats=False,
+                        return_n_batches=True,
+                        only_mask_evaluation=True)
+                        for (dataset_dir, partition) in dirs_and_parts]
+
+    data_info = [list(itertools.chain.from_iterable(info_lists))
+                 for info_lists in zip(datasets_loaders, dirs_and_parts)]
+
+    eval_results = Parallel(n_jobs=n_jobs)(
+                   [delayed(eval)(data_loader,
+                                  os.path.join(data_dir, partition))
+                   for (data_loader, n_batches, data_dir, partition)
+                   in tqdm(data_info)])
+
+    return eval_results
+
+
+def get_args():
+    """! Command line parser for computing the evaluation for
+    specific datasets"""
+    parser = argparse.ArgumentParser(description='Evaluating'
+             ' initial SDR SAR and SIR for datasets')
+    parser.add_argument("-i", "--dataset_folders", type=str, nargs='+',
+                        help="Dataset paths you want to evaluate",
+                        default=[])
+    parser.add_argument("--n_jobs", type=int,
+                        help="Number of parallel spawinign jobs",
+                        default=1)
+    parser.add_argument("--n_eval", type=int,
+                        help="""Reduce the number of evaluation 
+                            samples to this number.""", default=None)
+    return parser.parse_args()
+
+
+if __name__ == "__main__":
+    args = get_args()
+    eval_results = evaluate_bss_metrics(args.dataset_folders,
+                                        n_jobs=args.n_jobs,
+                                        get_top=args.n_eval)
+
+    df = pd.DataFrame(dict([(os.path.basename(os.path.dirname(p)) +
+                             '/' + os.path.basename(p), res)
+                            for (p, res) in eval_results])).T
+    pd.set_option('display.expand_frame_repr', False)
+    print(df)
