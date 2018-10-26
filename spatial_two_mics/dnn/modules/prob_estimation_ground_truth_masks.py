@@ -127,4 +127,4 @@ if __name__ == "__main__":
             file_path = os.path.join(save_folder_name,
                                      labels + '_mask_metrics.gz')
 
-            joblib.dump(eval_results, file_path)
+            joblib.dump(metrics, file_path)
