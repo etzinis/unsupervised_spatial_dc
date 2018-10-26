@@ -142,9 +142,9 @@ def get_args():
                         help="Dataset path you want to evaluate",
                         default=None)
     parser.add_argument("-m", "--pretrained_models", type=str,
-                        help="Paths of pretrained models that you "
+                        help="Path of pretrained model that you "
                              "need to test on this dataset",
-                        default=[])
+                        default=None)
     parser.add_argument("--n_jobs", type=int,
                         help="Number of parallel spawning jobs",
                         default=1)
