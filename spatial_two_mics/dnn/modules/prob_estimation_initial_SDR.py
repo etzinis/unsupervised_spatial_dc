@@ -76,7 +76,7 @@ def evaluate_bss_metrics(dataset_folder,
     result_dic = eval(val_generator,
                       os.path.join(dataset_dir, partition))
 
-    return dataset_folder, result_dic
+    return result_dic
 
 
 def get_args():
