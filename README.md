@@ -7,8 +7,10 @@ University of Illinois Open Source License
 Copyright © 2018, University of Illinois at Urbana Champaign. All rights reserved.
 
 Developed by: Efthymios Tzinis 1, Shrikant Venkataramani 1, Paris Smaragdis 1,2
+
 1: University of Illinois at Urbana-Champaign, 
 2: Adobe Research 
+
 This work was supported by NSF grant 1453104. 
 Paper link: https://arxiv.org/abs/1811.01531
 
